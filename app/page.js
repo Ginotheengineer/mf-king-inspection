@@ -318,6 +318,7 @@ This is an automated report from the MF King Vehicle Inspection System.
   const sendEmail = async () => {
     const emailData = generateEmailSummary();
     const failedItems = inspectionItems.filter(item => inspectionData[item.id] === 'fail');
+    const selectedWorkshopsList = workshops.filter(w => selectedWorkshops.includes(w.id));
     
     try {
       alert('⏳ Uploading photos and sending email...');
@@ -337,7 +338,7 @@ This is an automated report from the MF King Vehicle Inspection System.
       );
 
       const formattedItems = failedItemsWithPhotos.map((item, i) => 
-        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Photo: ${item.photoUrl}`
+        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Notes: ${notes[item.id] || 'No notes'}\n   Photo: ${item.photoUrl}`
       ).join('\n\n');
 
       const photoGalleryHTML = failedItemsWithPhotos
@@ -365,7 +366,7 @@ This is an automated report from the MF King Vehicle Inspection System.
             driver_name: driverInfo.name,
             truck_number: driverInfo.truckNumber,
             inspection_date: driverInfo.date,
-            workshop_name: workshops.find(w => w.id === selectedWorkshop)?.name,
+            workshop_name: selectedWorkshopsList.map(w => w.name).join(', '),
             failed_items: formattedItems,
             photo_gallery: photoGalleryHTML,
             total_issues: failedItems.length,
