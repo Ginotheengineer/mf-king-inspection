@@ -1088,10 +1088,22 @@ This is an automated report from the MF King Vehicle Inspection System.
                                 ⚠️ CRITICAL
                               </span>
                             )}
-                            {item.photoCount > 0 && (
-                              <span className="inline-block mt-2 ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                📷 {item.photoCount} photo{item.photoCount > 1 ? 's' : ''} attached
-                              </span>
+                            {inspection.photos[item.id] && inspection.photos[item.id].length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {inspection.photos[item.id].map((photo, photoIndex) => (
+                                  <img
+                                    key={photoIndex}
+                                    src={photo}
+                                    alt={`Issue ${photoIndex + 1}`}
+                                    className="w-20 h-20 object-cover rounded border-2 border-gray-300 cursor-pointer hover:border-blue-500"
+                                    onClick={() => {
+                                      setViewingPhoto(photo);
+                                      setViewingPhotoArray(inspection.photos[item.id]);
+                                      setViewingPhotoIndex(photoIndex);
+                                    }}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>
