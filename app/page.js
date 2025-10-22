@@ -8,8 +8,11 @@ export default function TruckInspectionApp() {
   
   // Get New Zealand date
   const getNZDate = () => {
-    const nzDate = new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" });
-    return new Date(nzDate).toISOString().split('T')[0];
+    const nzDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" }));
+    const year = nzDate.getFullYear();
+    const month = String(nzDate.getMonth() + 1).padStart(2, '0');
+    const day = String(nzDate.getDate()).padStart(2, '0');
+    return `${day}-${month}-${year}`;
   };
   
   const [driverInfo, setDriverInfo] = useState({ name: '', truckNumber: '', date: getNZDate() });
