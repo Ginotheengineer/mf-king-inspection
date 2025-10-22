@@ -701,8 +701,8 @@ This is an automated report from the MF King Vehicle Inspection System.
                   <Camera size={20} /> Add Photos of Damage
                 </label>
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <label className="bg-red-600 text-white py-3 px-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer text-sm sm:text-base">
-                    <Camera size={20} />
+                  <label className="bg-red-600 text-white py-2 px-2 rounded-lg font-bold text-center flex items-center justify-center gap-1 hover:bg-red-700 active:bg-red-800 cursor-pointer text-xs sm:text-sm whitespace-nowrap">
+                    <Camera size={18} />
                     Take Photo
                     <input
                       type="file"
@@ -713,7 +713,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                       className="hidden"
                     />
                   </label>
-                  <label className="bg-blue-600 text-white py-3 px-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-blue-700 active:bg-blue-800 cursor-pointer text-sm sm:text-base">
+                  <label className="bg-blue-600 text-white py-2 px-2 rounded-lg font-bold text-center flex items-center justify-center gap-1 hover:bg-blue-700 active:bg-blue-800 cursor-pointer text-xs sm:text-sm whitespace-nowrap">
                     📁 Upload Photo
                     <input
                       type="file"
