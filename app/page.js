@@ -6,18 +6,18 @@ import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, Histo
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
   
-  // Get New Zealand date
+  // Get New Zealand date in YYYY-MM-DD format for storage
   const getNZDate = () => {
     const nzDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" }));
     const year = nzDate.getFullYear();
     const month = String(nzDate.getMonth() + 1).padStart(2, '0');
     const day = String(nzDate.getDate()).padStart(2, '0');
-    return `${day}-${month}-${year}`;
+    return `${year}-${month}-${day}`;
   };
   
   const [driverInfo, setDriverInfo] = useState({ name: '', truckNumber: '', date: getNZDate() });
   const [inspectionData, setInspectionData] = useState({});
-  const [photos, setPhotos] = useState({});
+  const [photos, setPhotos] = useState({}); // Changed to store arrays of photos
   const [notes, setNotes] = useState({});
   const [selectedWorkshops, setSelectedWorkshops] = useState([]);
   const [showSummary, setShowSummary] = useState(false);
@@ -242,14 +242,63 @@ export default function TruckInspectionApp() {
   };
 
   const handlePhotoCapture = (itemId, event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotos(prev => ({ ...prev, [itemId]: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      Promise.all(
+        files.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // Compress image
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set max dimensions
+                const maxWidth = 800;
+                const maxHeight = 800;
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height) {
+                  if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                  }
+                } else {
+                  if (height > maxHeight) {
+                    width *= maxHeight / height;
+                    height = maxHeight;
+                  }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Compress to JPEG with 0.7 quality
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+              };
+              img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(compressedImages => {
+        setPhotos(prev => ({
+          ...prev,
+          [itemId]: [...(prev[itemId] || []), ...compressedImages]
+        }));
+      });
     }
+  };
+
+  const removePhoto = (itemId, photoIndex) => {
+    setPhotos(prev => ({
+      ...prev,
+      [itemId]: prev[itemId].filter((_, index) => index !== photoIndex)
+    }));
   };
 
   const hasDamages = () => {
@@ -271,7 +320,7 @@ export default function TruckInspectionApp() {
     
     return {
       to: selectedWorkshopsList.map(w => w.email).join(', '),
-      subject: `URGENT: Vehicle Inspection - Damages Reported - Vehicle #${driverInfo.truckNumber}`,
+      subject: `Vehicle Inspection Report - REGO: ${driverInfo.truckNumber}`,
       body: `
 VEHICLE INSPECTION DAMAGE REPORT
 
@@ -285,7 +334,7 @@ ${failedItems.map((item, i) => `
 ${i + 1}. ${item.category} - ${item.question}
    Status: FAILED ${item.critical ? '⚠️ CRITICAL' : ''}
    Notes: ${notes[item.id] || 'No notes provided'}
-   Photo: ${photos[item.id] ? 'Attached' : 'No photo provided'}
+   Photos: ${photos[item.id]?.length || 0} attached
 `).join('\n')}
 
 Total Issues: ${failedItems.length}
@@ -336,31 +385,38 @@ This is an automated report from the MF King Vehicle Inspection System.
       
       const failedItemsWithPhotos = await Promise.all(
         failedItems.map(async (item) => {
-          let photoUrl = 'No photo provided';
-          if (photos[item.id]) {
-            const uploadedUrl = await uploadImageToImgur(photos[item.id]);
-            photoUrl = uploadedUrl || 'Photo upload failed';
+          const photoUrls = [];
+          if (photos[item.id] && photos[item.id].length > 0) {
+            for (const photo of photos[item.id]) {
+              const uploadedUrl = await uploadImageToImgur(photo);
+              if (uploadedUrl) photoUrls.push(uploadedUrl);
+            }
           }
           return {
             ...item,
-            photoUrl
+            photoUrls
           };
         })
       );
 
       const formattedItems = failedItemsWithPhotos.map((item, i) => 
-        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Notes: ${notes[item.id] || 'No notes'}\n   Photo: ${item.photoUrl}`
+        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Notes: ${notes[item.id] || 'No notes'}\n   Photos: ${item.photoUrls.length > 0 ? item.photoUrls.join(', ') : 'No photos'}`
       ).join('\n\n');
 
       const photoGalleryHTML = failedItemsWithPhotos
-        .filter(item => item.photoUrl && item.photoUrl.startsWith('http'))
-        .map(item => `
+        .map(item => {
+          if (item.photoUrls.length === 0) return '';
+          return `
           <div style="margin-bottom: 20px; padding: 15px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
             <h4 style="color: #374151; margin: 0 0 10px 0;">${item.category}</h4>
             <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
-            <img src="${item.photoUrl}" alt="${item.category} damage" style="max-width: 100%; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />
-          </div>
-        `).join('');
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
+              ${item.photoUrls.map(url => 
+                `<img src="${url}" alt="${item.category} damage" style="width: 100%; max-width: 400px; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />`
+              ).join('')}
+            </div>
+          </div>`;
+        }).join('');
 
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
         method: 'POST',
@@ -411,14 +467,14 @@ This is an automated report from the MF King Vehicle Inspection System.
       timestamp: new Date().toISOString(),
       date: driverInfo.date,
       truckNumber: driverInfo.truckNumber,
-      reportSummary: {
+              reportSummary: {
         failedItems: failedItems.map(item => ({
           id: item.id,
           category: item.category,
           question: item.question,
           critical: item.critical,
           note: notes[item.id] || 'No notes',
-          hasPhoto: !!photos[item.id]
+          photoCount: photos[item.id]?.length || 0
         })),
         workshopNames: selectedWorkshopsList.map(w => w.name).join(', '),
         workshopEmails: selectedWorkshopsList.map(w => w.email).join(', ')
@@ -534,21 +590,33 @@ This is an automated report from the MF King Vehicle Inspection System.
                 />
                 
                 <label className="block text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
-                  <Camera size={20} /> Add Photo of Damage
+                  <Camera size={20} /> Add Photos of Damage
                 </label>
                 <label className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer">
                   <Camera size={24} />
-                  {photos[item.id] ? 'Change Photo' : 'Take Photo'}
+                  {photos[item.id]?.length > 0 ? 'Add More Photos' : 'Take/Upload Photos'}
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
+                    multiple
                     onChange={(e) => handlePhotoCapture(item.id, e)}
                     className="hidden"
                   />
                 </label>
-                {photos[item.id] && (
-                  <img src={photos[item.id]} alt="Damage" className="mt-4 w-full rounded-lg object-cover border-4 border-red-300" />
+                {photos[item.id] && photos[item.id].length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {photos[item.id].map((photo, index) => (
+                      <div key={index} className="relative">
+                        <img src={photo} alt={`Damage ${index + 1}`} className="w-full rounded-lg object-cover border-4 border-red-300" />
+                        <button
+                          onClick={() => removePhoto(item.id, index)}
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold hover:bg-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -635,7 +703,6 @@ This is an automated report from the MF King Vehicle Inspection System.
                   }`}
                 >
                   <h3 className="font-bold text-lg text-gray-800">{workshop.name}</h3>
-                  <p className="text-base text-gray-600 mt-1">{workshop.email}</p>
                 </button>
                 {!editingWorkshop && (
                   <button
@@ -788,12 +855,12 @@ This is an automated report from the MF King Vehicle Inspection System.
                               ⚠️ CRITICAL
                             </span>
                           )}
-                          {photos[item.id] && (
+                          {photos[item.id] && photos[item.id].length > 0 && (
                             <button
-                              onClick={() => setViewingPhoto(photos[item.id])}
+                              onClick={() => setViewingPhoto(photos[item.id][0])}
                               className="inline-block mt-2 ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 active:bg-blue-800 font-semibold"
                             >
-                              📷 View Photo
+                              📷 View Photos ({photos[item.id].length})
                             </button>
                           )}
                         </div>
@@ -894,9 +961,9 @@ This is an automated report from the MF King Vehicle Inspection System.
                                 ⚠️ CRITICAL
                               </span>
                             )}
-                            {item.hasPhoto && (
+                            {item.photoCount > 0 && (
                               <span className="inline-block mt-2 ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                📷 Photo attached
+                                📷 {item.photoCount} photo{item.photoCount > 1 ? 's' : ''} attached
                               </span>
                             )}
                           </div>
