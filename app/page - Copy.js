@@ -5,9 +5,19 @@ import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, Histo
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
-  const [driverInfo, setDriverInfo] = useState({ name: '', truckNumber: '', date: new Date().toISOString().split('T')[0] });
+  
+  // Get New Zealand date in YYYY-MM-DD format for storage
+  const getNZDate = () => {
+    const nzDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" }));
+    const year = nzDate.getFullYear();
+    const month = String(nzDate.getMonth() + 1).padStart(2, '0');
+    const day = String(nzDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const [driverInfo, setDriverInfo] = useState({ name: '', truckNumber: '', date: getNZDate() });
   const [inspectionData, setInspectionData] = useState({});
-  const [photos, setPhotos] = useState({});
+  const [photos, setPhotos] = useState({}); // Changed to store arrays of photos
   const [notes, setNotes] = useState({});
   const [selectedWorkshops, setSelectedWorkshops] = useState([]);
   const [showSummary, setShowSummary] = useState(false);
@@ -15,14 +25,24 @@ export default function TruckInspectionApp() {
   const [showHistory, setShowHistory] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(null);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [viewingPhotoIndex, setViewingPhotoIndex] = useState(0);
+  const [viewingPhotoArray, setViewingPhotoArray] = useState([]);
   const [workshops, setWorkshops] = useState([]);
   const [showAddWorkshop, setShowAddWorkshop] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
   const [workshopToDelete, setWorkshopToDelete] = useState(null);
   const [newWorkshop, setNewWorkshop] = useState({ name: '', email: '' });
   const [db, setDb] = useState(null);
+  const [logoError, setLogoError] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(null);
+  const [drivers, setDrivers] = useState([]);
+  const [showAddDriver, setShowAddDriver] = useState(false);
+  const [showManageDrivers, setShowManageDrivers] = useState(false);
+  const [newDriverName, setNewDriverName] = useState('');
+  const [driverToDelete, setDriverToDelete] = useState(null);
 
-  const drivers = ['Gino Esposito', 'Harry Wheelans'];
 
   const inspectionItems = [
     { id: 'tires', category: 'Tires & Wheels', question: 'Are all tires properly inflated and free from damage?', critical: true },
@@ -39,7 +59,7 @@ export default function TruckInspectionApp() {
 
   useEffect(() => {
     const initDB = () => {
-      const request = indexedDB.open('TruckInspectionDB', 2);
+      const request = indexedDB.open('TruckInspectionDB', 3);
 
       request.onerror = () => {
         console.error('Database failed to open');
@@ -50,6 +70,7 @@ export default function TruckInspectionApp() {
         setDb(database);
         loadInspections(database);
         loadWorkshops(database);
+        loadDrivers(database);
       };
 
       request.onupgradeneeded = (e) => {
@@ -69,11 +90,61 @@ export default function TruckInspectionApp() {
           const defaultWorkshop = { name: 'MF King Engineering Ltd', email: 'gino@mfking.co.nz' };
           workshopStore.add(defaultWorkshop);
         }
+        
+        if (!database.objectStoreNames.contains('drivers')) {
+          const driverStore = database.createObjectStore('drivers', { keyPath: 'id', autoIncrement: true });
+          driverStore.createIndex('name', 'name', { unique: false });
+          
+          // Add default drivers
+          driverStore.add({ name: 'Gino Esposito' });
+          driverStore.add({ name: 'Harry Wheelans' });
+        }
       };
     };
 
     initDB();
   }, []);
+
+  // Auto-redirect after 5 seconds when inspection is complete
+  useEffect(() => {
+    if (showSummary) {
+      // Redirect if no damages (All Clear) or if email has been sent
+      if (!hasDamages() || emailSent) {
+        setRedirectCountdown(5);
+        
+        const countdownInterval = setInterval(() => {
+          setRedirectCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        const timer = setTimeout(() => {
+          // Reset to start page
+          setCurrentStep('driver-info');
+          setDriverInfo({ name: '', truckNumber: '', date: getNZDate() });
+          setInspectionData({});
+          setPhotos({});
+          setNotes({});
+          setSelectedWorkshops([]);
+          setShowSummary(false);
+          setEmailSent(false);
+          setIsSendingEmail(false);
+          setRedirectCountdown(null);
+        }, 5000);
+
+        return () => {
+          clearTimeout(timer);
+          clearInterval(countdownInterval);
+        };
+      }
+    } else {
+      setRedirectCountdown(null);
+    }
+  }, [showSummary, emailSent]);
 
   const loadInspections = (database) => {
     const transaction = database.transaction(['inspections'], 'readonly');
@@ -93,6 +164,67 @@ export default function TruckInspectionApp() {
     request.onsuccess = () => {
       setWorkshops(request.result);
     };
+  };
+
+  const loadDrivers = (database) => {
+    const transaction = database.transaction(['drivers'], 'readonly');
+    const objectStore = transaction.objectStore('drivers');
+    const request = objectStore.getAll();
+
+    request.onsuccess = () => {
+      setDrivers(request.result);
+    };
+  };
+
+  const saveDriver = (driverName) => {
+    if (!db) return;
+
+    const transaction = db.transaction(['drivers'], 'readwrite');
+    const objectStore = transaction.objectStore('drivers');
+    const request = objectStore.add({ name: driverName });
+
+    request.onsuccess = () => {
+      loadDrivers(db);
+      alert('✅ Driver added successfully!');
+    };
+
+    request.onerror = () => {
+      alert('❌ Failed to add driver. Please try again.');
+    };
+  };
+
+  const deleteDriver = (driverId) => {
+    console.log('Attempting to delete driver:', driverId);
+    
+    if (!db) {
+      alert('❌ Database not ready. Please try again.');
+      return;
+    }
+    
+    if (drivers.length === 1) {
+      alert('❌ Cannot delete the last driver. At least one driver must remain.');
+      return;
+    }
+
+    try {
+      const transaction = db.transaction(['drivers'], 'readwrite');
+      const objectStore = transaction.objectStore('drivers');
+      const request = objectStore.delete(driverId);
+
+      request.onsuccess = () => {
+        console.log('Driver deleted successfully');
+        loadDrivers(db);
+        alert('✅ Driver deleted successfully!');
+      };
+
+      request.onerror = (error) => {
+        console.error('Delete failed:', error);
+        alert('❌ Failed to delete driver. Please try again.');
+      };
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('❌ Failed to delete driver. Please try again.');
+    }
   };
 
   const saveWorkshop = (workshop) => {
@@ -231,14 +363,63 @@ export default function TruckInspectionApp() {
   };
 
   const handlePhotoCapture = (itemId, event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotos(prev => ({ ...prev, [itemId]: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      Promise.all(
+        files.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // Compress image
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set max dimensions
+                const maxWidth = 800;
+                const maxHeight = 800;
+                let width = img.width;
+                let height = img.height;
+                
+                if (width > height) {
+                  if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                  }
+                } else {
+                  if (height > maxHeight) {
+                    width *= maxHeight / height;
+                    height = maxHeight;
+                  }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Compress to JPEG with 0.7 quality
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+              };
+              img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(compressedImages => {
+        setPhotos(prev => ({
+          ...prev,
+          [itemId]: [...(prev[itemId] || []), ...compressedImages]
+        }));
+      });
     }
+  };
+
+  const removePhoto = (itemId, photoIndex) => {
+    setPhotos(prev => ({
+      ...prev,
+      [itemId]: prev[itemId].filter((_, index) => index !== photoIndex)
+    }));
   };
 
   const hasDamages = () => {
@@ -260,7 +441,7 @@ export default function TruckInspectionApp() {
     
     return {
       to: selectedWorkshopsList.map(w => w.email).join(', '),
-      subject: `URGENT: Vehicle Inspection - Damages Reported - Vehicle #${driverInfo.truckNumber}`,
+      subject: `Vehicle Inspection Report - Rego: ${driverInfo.truckNumber}`,
       body: `
 VEHICLE INSPECTION DAMAGE REPORT
 
@@ -274,7 +455,7 @@ ${failedItems.map((item, i) => `
 ${i + 1}. ${item.category} - ${item.question}
    Status: FAILED ${item.critical ? '⚠️ CRITICAL' : ''}
    Notes: ${notes[item.id] || 'No notes provided'}
-   Photo: ${photos[item.id] ? 'Attached' : 'No photo provided'}
+   Photos: ${photos[item.id]?.length || 0} attached
 `).join('\n')}
 
 Total Issues: ${failedItems.length}
@@ -320,36 +501,43 @@ This is an automated report from the MF King Vehicle Inspection System.
     const failedItems = inspectionItems.filter(item => inspectionData[item.id] === 'fail');
     const selectedWorkshopsList = workshops.filter(w => selectedWorkshops.includes(w.id));
     
+    setIsSendingEmail(true);
+    
     try {
-      alert('⏳ Uploading photos and sending email...');
-      
       const failedItemsWithPhotos = await Promise.all(
         failedItems.map(async (item) => {
-          let photoUrl = 'No photo provided';
-          if (photos[item.id]) {
-            const uploadedUrl = await uploadImageToImgur(photos[item.id]);
-            photoUrl = uploadedUrl || 'Photo upload failed';
+          const photoUrls = [];
+          if (photos[item.id] && photos[item.id].length > 0) {
+            for (const photo of photos[item.id]) {
+              const uploadedUrl = await uploadImageToImgur(photo);
+              if (uploadedUrl) photoUrls.push(uploadedUrl);
+            }
           }
           return {
             ...item,
-            photoUrl
+            photoUrls
           };
         })
       );
 
       const formattedItems = failedItemsWithPhotos.map((item, i) => 
-        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Notes: ${notes[item.id] || 'No notes'}\n   Photo: ${item.photoUrl}`
+        `${i + 1}. ${item.category} - ${item.question} ${item.critical ? '⚠️ CRITICAL' : ''}\n   Notes: ${notes[item.id] || 'No notes'}\n   Photos: ${item.photoUrls.length > 0 ? item.photoUrls.join(', ') : 'No photos'}`
       ).join('\n\n');
 
       const photoGalleryHTML = failedItemsWithPhotos
-        .filter(item => item.photoUrl && item.photoUrl.startsWith('http'))
-        .map(item => `
+        .map(item => {
+          if (item.photoUrls.length === 0) return '';
+          return `
           <div style="margin-bottom: 20px; padding: 15px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
             <h4 style="color: #374151; margin: 0 0 10px 0;">${item.category}</h4>
             <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
-            <img src="${item.photoUrl}" alt="${item.category} damage" style="max-width: 100%; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />
-          </div>
-        `).join('');
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
+              ${item.photoUrls.map(url => 
+                `<img src="${url}" alt="${item.category} damage" style="width: 100%; max-width: 400px; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />`
+              ).join('')}
+            </div>
+          </div>`;
+        }).join('');
 
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
         method: 'POST',
@@ -376,11 +564,39 @@ This is an automated report from the MF King Vehicle Inspection System.
       });
 
       if (response.ok) {
-        alert('✅ Email sent successfully to ' + emailData.to + '\nPhotos have been uploaded and included in the email.');
+        // Save to inspection history after successful email send
+        const inspectionRecord = {
+          driverInfo,
+          inspectionData,
+          photos,
+          notes,
+          selectedWorkshops,
+          hasDamages: hasDamages(),
+          timestamp: new Date().toISOString(),
+          date: driverInfo.date,
+          truckNumber: driverInfo.truckNumber,
+          reportSummary: {
+            failedItems: failedItems.map(item => ({
+              id: item.id,
+              category: item.category,
+              question: item.question,
+              critical: item.critical,
+              note: notes[item.id] || 'No notes',
+              photoCount: photos[item.id]?.length || 0
+            })),
+            workshopNames: selectedWorkshopsList.map(w => w.name).join(', '),
+            workshopEmails: selectedWorkshopsList.map(w => w.email).join(', ')
+          }
+        };
+        
+        saveInspection(inspectionRecord);
+        setEmailSent(true);
+        setIsSendingEmail(false);
       } else {
         throw new Error('Email sending failed');
       }
     } catch (error) {
+      setIsSendingEmail(false);
       alert('❌ Failed to send email. Please check your internet connection or contact support.');
       console.error('Email error:', error);
     }
@@ -400,21 +616,25 @@ This is an automated report from the MF King Vehicle Inspection System.
       timestamp: new Date().toISOString(),
       date: driverInfo.date,
       truckNumber: driverInfo.truckNumber,
-      reportSummary: {
+              reportSummary: {
         failedItems: failedItems.map(item => ({
           id: item.id,
           category: item.category,
           question: item.question,
           critical: item.critical,
           note: notes[item.id] || 'No notes',
-          hasPhoto: !!photos[item.id]
+          photoCount: photos[item.id]?.length || 0
         })),
         workshopNames: selectedWorkshopsList.map(w => w.name).join(', '),
         workshopEmails: selectedWorkshopsList.map(w => w.email).join(', ')
       }
     };
 
-    saveInspection(inspectionRecord);
+    // If no damages, save immediately to history
+    if (!hasDamages()) {
+      saveInspection(inspectionRecord);
+    }
+    // If damages, will save when Send Report is clicked
     setShowSummary(true);
   };
 
@@ -423,7 +643,15 @@ This is an automated report from the MF King Vehicle Inspection System.
       <h2 className="text-2xl font-bold text-gray-800">Driver Information</h2>
       <div className="space-y-4">
         <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">Driver Name</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-base font-medium text-gray-700">Driver Name</label>
+            <button
+              onClick={() => setShowManageDrivers(true)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Manage Drivers
+            </button>
+          </div>
           <select
             value={driverInfo.name}
             onChange={(e) => setDriverInfo(prev => ({ ...prev, name: e.target.value }))}
@@ -431,7 +659,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           >
             <option value="">Select driver</option>
             {drivers.map((driver) => (
-              <option key={driver} value={driver}>{driver}</option>
+              <option key={driver.id} value={driver.name}>{driver.name}</option>
             ))}
           </select>
         </div>
@@ -443,15 +671,6 @@ This is an automated report from the MF King Vehicle Inspection System.
             onChange={(e) => setDriverInfo(prev => ({ ...prev, truckNumber: e.target.value.toUpperCase() }))}
             className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 uppercase"
             placeholder="e.g., ABC123"
-          />
-        </div>
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">Date</label>
-          <input
-            type="date"
-            value={driverInfo.date}
-            onChange={(e) => setDriverInfo(prev => ({ ...prev, date: e.target.value }))}
-            className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
           />
         </div>
       </div>
@@ -477,6 +696,12 @@ This is an automated report from the MF King Vehicle Inspection System.
   const renderInspection = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4 sticky top-0 bg-white py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 z-10 border-b-2 border-gray-100 shadow-sm">
+        <button
+          onClick={() => setCurrentStep('driver-info')}
+          className="text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          ← Back
+        </button>
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Vehicle Inspection</h2>
         <span className="text-base sm:text-lg font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
           {Object.keys(inspectionData).length}/{inspectionItems.length}
@@ -490,7 +715,31 @@ This is an automated report from the MF King Vehicle Inspection System.
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-2">
                   {item.category}
-                  {item.critical && <AlertTriangle size={20} className="text-red-600" />}
+                  {item.critical && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const tooltip = e.currentTarget.querySelector('.tooltip-text');
+                        tooltip.classList.toggle('opacity-0');
+                        tooltip.classList.toggle('invisible');
+                        tooltip.classList.toggle('opacity-100');
+                        tooltip.classList.toggle('visible');
+                        // Auto-hide after 3 seconds
+                        setTimeout(() => {
+                          tooltip.classList.add('opacity-0', 'invisible');
+                          tooltip.classList.remove('opacity-100', 'visible');
+                        }, 3000);
+                      }}
+                      className="relative inline-block"
+                    >
+                      <AlertTriangle size={20} className="text-red-600" />
+                      <span className="tooltip-text absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
+                        Critical safety item - must be functional
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
+                      </span>
+                    </button>
+                  )}
                 </h3>
                 <p className="text-base text-gray-600 leading-relaxed">{item.question}</p>
               </div>
@@ -532,21 +781,46 @@ This is an automated report from the MF King Vehicle Inspection System.
                 />
                 
                 <label className="block text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
-                  <Camera size={20} /> Add Photo of Damage
+                  <Camera size={20} /> Add Photos of Damage
                 </label>
-                <label className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer">
-                  <Camera size={24} />
-                  {photos[item.id] ? 'Change Photo' : 'Take Photo'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => handlePhotoCapture(item.id, e)}
-                    className="hidden"
-                  />
-                </label>
-                {photos[item.id] && (
-                  <img src={photos[item.id]} alt="Damage" className="mt-4 w-full rounded-lg object-cover border-4 border-red-300" />
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <label className="bg-red-600 text-white py-2 px-2 rounded-lg font-bold text-center flex items-center justify-center gap-1 hover:bg-red-700 active:bg-red-800 cursor-pointer text-xs sm:text-sm whitespace-nowrap">
+                    <Camera size={18} />
+                    Take Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      multiple
+                      onChange={(e) => handlePhotoCapture(item.id, e)}
+                      className="hidden"
+                    />
+                  </label>
+                  <label className="bg-blue-600 text-white py-2 px-2 rounded-lg font-bold text-center flex items-center justify-center gap-1 hover:bg-blue-700 active:bg-blue-800 cursor-pointer text-xs sm:text-sm whitespace-nowrap">
+                    📁 Upload Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handlePhotoCapture(item.id, e)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {photos[item.id] && photos[item.id].length > 0 && (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {photos[item.id].map((photo, index) => (
+                      <div key={index} className="relative">
+                        <img src={photo} alt={`Damage ${index + 1}`} className="w-full rounded-lg object-cover border-4 border-red-300" />
+                        <button
+                          onClick={() => removePhoto(item.id, index)}
+                          className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold hover:bg-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -566,7 +840,16 @@ This is an automated report from the MF King Vehicle Inspection System.
 
   const renderWorkshopSelection = () => (
     <div className="space-y-5">
-      <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setCurrentStep('inspection')}
+          className="text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          ← Back
+        </button>
+        <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
+        <div className="w-16"></div>
+      </div>
       <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
         <p className="text-red-700 font-bold text-base">⚠️ Damages detected - Select one or more workshops</p>
       </div>
@@ -633,7 +916,6 @@ This is an automated report from the MF King Vehicle Inspection System.
                   }`}
                 >
                   <h3 className="font-bold text-lg text-gray-800">{workshop.name}</h3>
-                  <p className="text-base text-gray-600 mt-1">{workshop.email}</p>
                 </button>
                 {!editingWorkshop && (
                   <button
@@ -733,7 +1015,23 @@ This is an automated report from the MF King Vehicle Inspection System.
 
     return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
+        <div className="flex items-center justify-between">
+          {hasDamages() ? (
+            <button
+              onClick={() => {
+                setShowSummary(false);
+                setCurrentStep('workshop');
+              }}
+              className="text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              ← Back
+            </button>
+          ) : (
+            <div className="w-16"></div>
+          )}
+          <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
+          <div className="w-16"></div>
+        </div>
         
         {hasDamages() ? (
           <div className="space-y-4">
@@ -782,16 +1080,24 @@ This is an automated report from the MF King Vehicle Inspection System.
                             </p>
                           )}
                           {item.critical && (
-                            <span className="inline-block mt-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">
+                            <span className="inline-block mt-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold relative group cursor-help">
                               ⚠️ CRITICAL
+                              <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Critical safety item - must be functional
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></span>
+                              </span>
                             </span>
                           )}
-                          {photos[item.id] && (
+                          {photos[item.id] && photos[item.id].length > 0 && (
                             <button
-                              onClick={() => setViewingPhoto(photos[item.id])}
+                              onClick={() => {
+                                setViewingPhotoArray(photos[item.id]);
+                                setViewingPhotoIndex(0);
+                                setViewingPhoto(photos[item.id][0]);
+                              }}
                               className="inline-block mt-2 ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 active:bg-blue-800 font-semibold"
                             >
-                              📷 View Photo
+                              📷 View Photos ({photos[item.id].length})
                             </button>
                           )}
                         </div>
@@ -804,31 +1110,45 @@ This is an automated report from the MF King Vehicle Inspection System.
 
             <button
               onClick={sendEmail}
-              className="w-full bg-red-600 text-white py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 transition-colors shadow-lg"
+              disabled={isSendingEmail || emailSent}
+              className={`w-full py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg ${
+                emailSent 
+                  ? 'bg-green-600 text-white cursor-default'
+                  : isSendingEmail
+                  ? 'bg-orange-500 text-white cursor-wait'
+                  : 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800'
+              }`}
             >
-              <Send size={24} /> Send Report
+              {emailSent ? (
+                <>
+                  <CheckCircle2 size={24} /> Report Sent
+                  {redirectCountdown !== null && (
+                    <span className="ml-2">({redirectCountdown}s)</span>
+                  )}
+                </>
+              ) : isSendingEmail ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  Sending Report...
+                </>
+              ) : (
+                <>
+                  <Send size={24} /> Send Report
+                </>
+              )}
             </button>
           </div>
         ) : (
           <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5">
             <h3 className="font-bold text-green-800 text-xl mb-2">✓ All Clear!</h3>
             <p className="text-green-700 text-base">No damages detected. Vehicle is ready for operation.</p>
+            {redirectCountdown !== null && (
+              <p className="text-green-600 text-sm mt-3 font-semibold">
+                Redirecting to start page in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
+              </p>
+            )}
           </div>
         )}
-
-        <button
-          onClick={() => {
-            setCurrentStep('driver-info');
-            setInspectionData({});
-            setPhotos({});
-            setNotes({});
-            setSelectedWorkshops([]);
-            setShowSummary(false);
-          }}
-          className="w-full bg-gray-600 text-white py-4 text-lg rounded-xl font-bold hover:bg-gray-700 active:bg-gray-800 transition-colors"
-        >
-          Start New Inspection
-        </button>
       </div>
     );
   };
@@ -892,10 +1212,22 @@ This is an automated report from the MF King Vehicle Inspection System.
                                 ⚠️ CRITICAL
                               </span>
                             )}
-                            {item.hasPhoto && (
-                              <span className="inline-block mt-2 ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                📷 Photo attached
-                              </span>
+                            {inspection.photos[item.id] && inspection.photos[item.id].length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {inspection.photos[item.id].map((photo, photoIndex) => (
+                                  <img
+                                    key={photoIndex}
+                                    src={photo}
+                                    alt={`Issue ${photoIndex + 1}`}
+                                    className="w-20 h-20 object-cover rounded border-2 border-gray-300 cursor-pointer hover:border-blue-500"
+                                    onClick={() => {
+                                      setViewingPhoto(photo);
+                                      setViewingPhotoArray(inspection.photos[item.id]);
+                                      setViewingPhotoIndex(photoIndex);
+                                    }}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -982,21 +1314,33 @@ This is an automated report from the MF King Vehicle Inspection System.
       <div className="max-w-3xl mx-auto px-3 sm:px-4">
         <div className="bg-white shadow-lg mb-4">
           <div className="flex flex-col items-center py-4 px-3">
-            <div className="mb-2">
-              <div className="text-center">
-                <div className="font-bold text-3xl sm:text-4xl mb-1">
-                  <span className="text-red-600">MF</span>
-                  <span className="text-gray-900">-KING</span>
+            <div className="mb-3">
+              {!logoError ? (
+                <img 
+                  src="/mf-king-logo.jpg" 
+                  alt="MF King Engineering Ltd" 
+                  className="h-20 w-auto object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <div className="text-center">
+                  <div className="font-bold text-3xl sm:text-4xl mb-1">
+                    <span className="text-red-600">MF</span>
+                    <span className="text-gray-900">-KING</span>
+                  </div>
+                  <div className="text-xs tracking-[0.3em] text-gray-700 font-light">
+                    ENGINEERING LTD.
+                  </div>
+                  <div className="h-1 bg-red-600 w-full mt-2"></div>
                 </div>
-                <div className="text-xs tracking-[0.3em] text-gray-700 font-light">
-                  ENGINEERING LTD.
-                </div>
-                <div className="h-1 bg-red-600 w-full mt-2"></div>
-              </div>
+              )}
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-center text-gray-800">
               Vehicle Pre-Start Inspection
             </h1>
+            <p className="text-sm sm:text-base text-gray-600 text-center mt-2 px-4">
+              Use this checklist to make a quick visual assessment of vehicle condition and generate a report of any issues
+            </p>
           </div>
         </div>
 
@@ -1016,15 +1360,54 @@ This is an automated report from the MF King Vehicle Inspection System.
       {viewingPhoto && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
-          onClick={() => setViewingPhoto(null)}
+          onClick={() => {
+            setViewingPhoto(null);
+            setViewingPhotoArray([]);
+            setViewingPhotoIndex(0);
+          }}
         >
           <div className="relative max-w-4xl max-h-full">
             <button
-              onClick={() => setViewingPhoto(null)}
+              onClick={() => {
+                setViewingPhoto(null);
+                setViewingPhotoArray([]);
+                setViewingPhotoIndex(0);
+              }}
               className="absolute top-4 right-4 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
             >
               ✕
             </button>
+            
+            {viewingPhotoArray.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newIndex = viewingPhotoIndex > 0 ? viewingPhotoIndex - 1 : viewingPhotoArray.length - 1;
+                    setViewingPhotoIndex(newIndex);
+                    setViewingPhoto(viewingPhotoArray[newIndex]);
+                  }}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newIndex = viewingPhotoIndex < viewingPhotoArray.length - 1 ? viewingPhotoIndex + 1 : 0;
+                    setViewingPhotoIndex(newIndex);
+                    setViewingPhoto(viewingPhotoArray[newIndex]);
+                  }}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
+                >
+                  ›
+                </button>
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                  {viewingPhotoIndex + 1} / {viewingPhotoArray.length}
+                </div>
+              </>
+            )}
+            
             <img 
               src={viewingPhoto} 
               alt="Damage photo" 
@@ -1063,6 +1446,130 @@ This is an automated report from the MF King Vehicle Inspection System.
               </button>
               <button
                 onClick={() => setWorkshopToDelete(null)}
+                className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Drivers Modal */}
+      {showManageDrivers && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowManageDrivers(false)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Manage Drivers</h3>
+              <button
+                onClick={() => setShowManageDrivers(false)}
+                className="text-gray-600 hover:text-gray-800 font-bold text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              {drivers.map((driver) => (
+                <div key={driver.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <span className="font-semibold text-gray-800">{driver.name}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDriverToDelete(driver);
+                    }}
+                    className="text-red-600 hover:text-red-800 font-semibold text-sm px-3 py-1 bg-red-100 rounded hover:bg-red-200"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {!showAddDriver ? (
+              <button
+                onClick={() => setShowAddDriver(true)}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+              >
+                + Add Driver
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={newDriverName}
+                  onChange={(e) => setNewDriverName(e.target.value)}
+                  placeholder="Enter driver name..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (newDriverName.trim()) {
+                        saveDriver(newDriverName.trim());
+                        setNewDriverName('');
+                        setShowAddDriver(false);
+                      } else {
+                        alert('Please enter a driver name');
+                      }
+                    }}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewDriverName('');
+                      setShowAddDriver(false);
+                    }}
+                    className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Delete Confirmation Modal */}
+      {driverToDelete && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          style={{zIndex: 9999}}
+          onClick={() => setDriverToDelete(null)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-3">Delete Driver?</h3>
+            <p className="text-gray-700 mb-2">
+              Are you sure you want to delete:
+            </p>
+            <p className="font-semibold text-gray-900 mb-6">
+              "{driverToDelete.name}"
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  deleteDriver(driverToDelete.id);
+                  setDriverToDelete(null);
+                }}
+                className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setDriverToDelete(null)}
                 className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
               >
                 Cancel
