@@ -34,6 +34,8 @@ export default function TruckInspectionApp() {
   const [newWorkshop, setNewWorkshop] = useState({ name: '', email: '' });
   const [db, setDb] = useState(null);
   const [logoError, setLogoError] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const drivers = ['Gino Esposito', 'Harry Wheelans'];
 
@@ -382,9 +384,9 @@ This is an automated report from the MF King Vehicle Inspection System.
     const failedItems = inspectionItems.filter(item => inspectionData[item.id] === 'fail');
     const selectedWorkshopsList = workshops.filter(w => selectedWorkshops.includes(w.id));
     
+    setIsSendingEmail(true);
+    
     try {
-      alert('⏳ Uploading photos and sending email...');
-      
       const failedItemsWithPhotos = await Promise.all(
         failedItems.map(async (item) => {
           const photoUrls = [];
@@ -445,11 +447,13 @@ This is an automated report from the MF King Vehicle Inspection System.
       });
 
       if (response.ok) {
-        alert('✅ Email sent successfully to ' + emailData.to + '\nPhotos have been uploaded and included in the email.');
+        setEmailSent(true);
+        setIsSendingEmail(false);
       } else {
         throw new Error('Email sending failed');
       }
     } catch (error) {
+      setIsSendingEmail(false);
       alert('❌ Failed to send email. Please check your internet connection or contact support.');
       console.error('Email error:', error);
     }
@@ -879,9 +883,29 @@ This is an automated report from the MF King Vehicle Inspection System.
 
             <button
               onClick={sendEmail}
-              className="w-full bg-red-600 text-white py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 transition-colors shadow-lg"
+              disabled={isSendingEmail || emailSent}
+              className={`w-full py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg ${
+                emailSent 
+                  ? 'bg-green-600 text-white cursor-default'
+                  : isSendingEmail
+                  ? 'bg-orange-500 text-white cursor-wait'
+                  : 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800'
+              }`}
             >
-              <Send size={24} /> Send Report
+              {emailSent ? (
+                <>
+                  <CheckCircle2 size={24} /> Report Sent
+                </>
+              ) : isSendingEmail ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  Sending Report...
+                </>
+              ) : (
+                <>
+                  <Send size={24} /> Send Report
+                </>
+              )}
             </button>
           </div>
         ) : (
@@ -899,6 +923,8 @@ This is an automated report from the MF King Vehicle Inspection System.
             setNotes({});
             setSelectedWorkshops([]);
             setShowSummary(false);
+            setEmailSent(false);
+            setIsSendingEmail(false);
           }}
           className="w-full bg-gray-600 text-white py-4 text-lg rounded-xl font-bold hover:bg-gray-700 active:bg-gray-800 transition-colors"
         >
