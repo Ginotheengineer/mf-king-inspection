@@ -366,7 +366,7 @@ export default function TruckInspectionApp() {
     
     return {
       to: selectedWorkshopsList.map(w => w.email).join(', '),
-      subject: `Vehicle Inspection Report - REGO: ${driverInfo.truckNumber}`,
+      subject: `Vehicle Inspection Report - Rego: ${driverInfo.truckNumber}`,
       body: `
 VEHICLE INSPECTION DAMAGE REPORT
 
@@ -632,7 +632,31 @@ This is an automated report from the MF King Vehicle Inspection System.
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-2">
                   {item.category}
-                  {item.critical && <AlertTriangle size={20} className="text-red-600" />}
+                  {item.critical && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const tooltip = e.currentTarget.querySelector('.tooltip-text');
+                        tooltip.classList.toggle('opacity-0');
+                        tooltip.classList.toggle('invisible');
+                        tooltip.classList.toggle('opacity-100');
+                        tooltip.classList.toggle('visible');
+                        // Auto-hide after 3 seconds
+                        setTimeout(() => {
+                          tooltip.classList.add('opacity-0', 'invisible');
+                          tooltip.classList.remove('opacity-100', 'visible');
+                        }, 3000);
+                      }}
+                      className="relative inline-block"
+                    >
+                      <AlertTriangle size={20} className="text-red-600" />
+                      <span className="tooltip-text absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
+                        Critical safety item - must be functional
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
+                      </span>
+                    </button>
+                  )}
                 </h3>
                 <p className="text-base text-gray-600 leading-relaxed">{item.question}</p>
               </div>
@@ -676,8 +700,8 @@ This is an automated report from the MF King Vehicle Inspection System.
                 <label className="block text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
                   <Camera size={20} /> Add Photos of Damage
                 </label>
-                <div className="flex gap-3 mb-4">
-                  <label className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer">
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <label className="bg-red-600 text-white py-3 px-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer text-sm sm:text-base">
                     <Camera size={20} />
                     Take Photo
                     <input
@@ -689,8 +713,8 @@ This is an automated report from the MF King Vehicle Inspection System.
                       className="hidden"
                     />
                   </label>
-                  <label className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-blue-700 active:bg-blue-800 cursor-pointer">
-                    📁 Upload
+                  <label className="bg-blue-600 text-white py-3 px-3 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-blue-700 active:bg-blue-800 cursor-pointer text-sm sm:text-base">
+                    📁 Upload Photo
                     <input
                       type="file"
                       accept="image/*"
@@ -973,8 +997,12 @@ This is an automated report from the MF King Vehicle Inspection System.
                             </p>
                           )}
                           {item.critical && (
-                            <span className="inline-block mt-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">
+                            <span className="inline-block mt-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold relative group cursor-help">
                               ⚠️ CRITICAL
+                              <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Critical safety item - must be functional
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></span>
+                              </span>
                             </span>
                           )}
                           {photos[item.id] && photos[item.id].length > 0 && (
