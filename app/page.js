@@ -37,8 +37,12 @@ export default function TruckInspectionApp() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(null);
+  const [drivers, setDrivers] = useState([]);
+  const [showAddDriver, setShowAddDriver] = useState(false);
+  const [showManageDrivers, setShowManageDrivers] = useState(false);
+  const [newDriverName, setNewDriverName] = useState('');
+  const [driverToDelete, setDriverToDelete] = useState(null);
 
-  const drivers = ['Gino Esposito', 'Harry Wheelans'];
 
   const inspectionItems = [
     { id: 'tires', category: 'Tires & Wheels', question: 'Are all tires properly inflated and free from damage?', critical: true },
@@ -55,7 +59,7 @@ export default function TruckInspectionApp() {
 
   useEffect(() => {
     const initDB = () => {
-      const request = indexedDB.open('TruckInspectionDB', 2);
+      const request = indexedDB.open('TruckInspectionDB', 3);
 
       request.onerror = () => {
         console.error('Database failed to open');
@@ -66,6 +70,7 @@ export default function TruckInspectionApp() {
         setDb(database);
         loadInspections(database);
         loadWorkshops(database);
+        loadDrivers(database);
       };
 
       request.onupgradeneeded = (e) => {
@@ -84,6 +89,15 @@ export default function TruckInspectionApp() {
           // Add default workshop
           const defaultWorkshop = { name: 'MF King Engineering Ltd', email: 'gino@mfking.co.nz' };
           workshopStore.add(defaultWorkshop);
+        }
+        
+        if (!database.objectStoreNames.contains('drivers')) {
+          const driverStore = database.createObjectStore('drivers', { keyPath: 'id', autoIncrement: true });
+          driverStore.createIndex('name', 'name', { unique: false });
+          
+          // Add default drivers
+          driverStore.add({ name: 'Gino Esposito' });
+          driverStore.add({ name: 'Harry Wheelans' });
         }
       };
     };
@@ -150,6 +164,67 @@ export default function TruckInspectionApp() {
     request.onsuccess = () => {
       setWorkshops(request.result);
     };
+  };
+
+  const loadDrivers = (database) => {
+    const transaction = database.transaction(['drivers'], 'readonly');
+    const objectStore = transaction.objectStore('drivers');
+    const request = objectStore.getAll();
+
+    request.onsuccess = () => {
+      setDrivers(request.result);
+    };
+  };
+
+  const saveDriver = (driverName) => {
+    if (!db) return;
+
+    const transaction = db.transaction(['drivers'], 'readwrite');
+    const objectStore = transaction.objectStore('drivers');
+    const request = objectStore.add({ name: driverName });
+
+    request.onsuccess = () => {
+      loadDrivers(db);
+      alert('✅ Driver added successfully!');
+    };
+
+    request.onerror = () => {
+      alert('❌ Failed to add driver. Please try again.');
+    };
+  };
+
+  const deleteDriver = (driverId) => {
+    console.log('Attempting to delete driver:', driverId);
+    
+    if (!db) {
+      alert('❌ Database not ready. Please try again.');
+      return;
+    }
+    
+    if (drivers.length === 1) {
+      alert('❌ Cannot delete the last driver. At least one driver must remain.');
+      return;
+    }
+
+    try {
+      const transaction = db.transaction(['drivers'], 'readwrite');
+      const objectStore = transaction.objectStore('drivers');
+      const request = objectStore.delete(driverId);
+
+      request.onsuccess = () => {
+        console.log('Driver deleted successfully');
+        loadDrivers(db);
+        alert('✅ Driver deleted successfully!');
+      };
+
+      request.onerror = (error) => {
+        console.error('Delete failed:', error);
+        alert('❌ Failed to delete driver. Please try again.');
+      };
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('❌ Failed to delete driver. Please try again.');
+    }
   };
 
   const saveWorkshop = (workshop) => {
@@ -568,7 +643,15 @@ This is an automated report from the MF King Vehicle Inspection System.
       <h2 className="text-2xl font-bold text-gray-800">Driver Information</h2>
       <div className="space-y-4">
         <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">Driver Name</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-base font-medium text-gray-700">Driver Name</label>
+            <button
+              onClick={() => setShowManageDrivers(true)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Manage Drivers
+            </button>
+          </div>
           <select
             value={driverInfo.name}
             onChange={(e) => setDriverInfo(prev => ({ ...prev, name: e.target.value }))}
@@ -576,7 +659,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           >
             <option value="">Select driver</option>
             {drivers.map((driver) => (
-              <option key={driver} value={driver}>{driver}</option>
+              <option key={driver.id} value={driver.name}>{driver.name}</option>
             ))}
           </select>
         </div>
@@ -1363,6 +1446,130 @@ This is an automated report from the MF King Vehicle Inspection System.
               </button>
               <button
                 onClick={() => setWorkshopToDelete(null)}
+                className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Drivers Modal */}
+      {showManageDrivers && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowManageDrivers(false)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Manage Drivers</h3>
+              <button
+                onClick={() => setShowManageDrivers(false)}
+                className="text-gray-600 hover:text-gray-800 font-bold text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              {drivers.map((driver) => (
+                <div key={driver.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <span className="font-semibold text-gray-800">{driver.name}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDriverToDelete(driver);
+                    }}
+                    className="text-red-600 hover:text-red-800 font-semibold text-sm px-3 py-1 bg-red-100 rounded hover:bg-red-200"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {!showAddDriver ? (
+              <button
+                onClick={() => setShowAddDriver(true)}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+              >
+                + Add Driver
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={newDriverName}
+                  onChange={(e) => setNewDriverName(e.target.value)}
+                  placeholder="Enter driver name..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (newDriverName.trim()) {
+                        saveDriver(newDriverName.trim());
+                        setNewDriverName('');
+                        setShowAddDriver(false);
+                      } else {
+                        alert('Please enter a driver name');
+                      }
+                    }}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewDriverName('');
+                      setShowAddDriver(false);
+                    }}
+                    className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Delete Confirmation Modal */}
+      {driverToDelete && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          style={{zIndex: 9999}}
+          onClick={() => setDriverToDelete(null)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-3">Delete Driver?</h3>
+            <p className="text-gray-700 mb-2">
+              Are you sure you want to delete:
+            </p>
+            <p className="font-semibold text-gray-900 mb-6">
+              "{driverToDelete.name}"
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  deleteDriver(driverToDelete.id);
+                  setDriverToDelete(null);
+                }}
+                className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setDriverToDelete(null)}
                 className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
               >
                 Cancel
