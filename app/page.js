@@ -676,17 +676,30 @@ This is an automated report from the MF King Vehicle Inspection System.
                 <label className="block text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
                   <Camera size={20} /> Add Photos of Damage
                 </label>
-                <label className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer">
-                  <Camera size={24} />
-                  {photos[item.id]?.length > 0 ? 'Add More Photos' : 'Take/Upload Photos'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => handlePhotoCapture(item.id, e)}
-                    className="hidden"
-                  />
-                </label>
+                <div className="flex gap-3 mb-4">
+                  <label className="flex-1 bg-red-600 text-white py-3 px-4 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 cursor-pointer">
+                    <Camera size={20} />
+                    Take Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      multiple
+                      onChange={(e) => handlePhotoCapture(item.id, e)}
+                      className="hidden"
+                    />
+                  </label>
+                  <label className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-bold text-center flex items-center justify-center gap-2 hover:bg-blue-700 active:bg-blue-800 cursor-pointer">
+                    📁 Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handlePhotoCapture(item.id, e)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 {photos[item.id] && photos[item.id].length > 0 && (
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {photos[item.id].map((photo, index) => (
