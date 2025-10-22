@@ -36,6 +36,7 @@ export default function TruckInspectionApp() {
   const [logoError, setLogoError] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(null);
 
   const drivers = ['Gino Esposito', 'Harry Wheelans'];
 
@@ -89,6 +90,47 @@ export default function TruckInspectionApp() {
 
     initDB();
   }, []);
+
+  // Auto-redirect after 5 seconds when inspection is complete
+  useEffect(() => {
+    if (showSummary) {
+      // Redirect if no damages (All Clear) or if email has been sent
+      if (!hasDamages() || emailSent) {
+        setRedirectCountdown(5);
+        
+        const countdownInterval = setInterval(() => {
+          setRedirectCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        const timer = setTimeout(() => {
+          // Reset to start page
+          setCurrentStep('driver-info');
+          setDriverInfo({ name: '', truckNumber: '', date: getNZDate() });
+          setInspectionData({});
+          setPhotos({});
+          setNotes({});
+          setSelectedWorkshops([]);
+          setShowSummary(false);
+          setEmailSent(false);
+          setIsSendingEmail(false);
+          setRedirectCountdown(null);
+        }, 5000);
+
+        return () => {
+          clearTimeout(timer);
+          clearInterval(countdownInterval);
+        };
+      }
+    } else {
+      setRedirectCountdown(null);
+    }
+  }, [showSummary, emailSent]);
 
   const loadInspections = (database) => {
     const transaction = database.transaction(['inspections'], 'readonly');
@@ -447,6 +489,32 @@ This is an automated report from the MF King Vehicle Inspection System.
       });
 
       if (response.ok) {
+        // Save to inspection history after successful email send
+        const inspectionRecord = {
+          driverInfo,
+          inspectionData,
+          photos,
+          notes,
+          selectedWorkshops,
+          hasDamages: hasDamages(),
+          timestamp: new Date().toISOString(),
+          date: driverInfo.date,
+          truckNumber: driverInfo.truckNumber,
+          reportSummary: {
+            failedItems: failedItems.map(item => ({
+              id: item.id,
+              category: item.category,
+              question: item.question,
+              critical: item.critical,
+              note: notes[item.id] || 'No notes',
+              photoCount: photos[item.id]?.length || 0
+            })),
+            workshopNames: selectedWorkshopsList.map(w => w.name).join(', '),
+            workshopEmails: selectedWorkshopsList.map(w => w.email).join(', ')
+          }
+        };
+        
+        saveInspection(inspectionRecord);
         setEmailSent(true);
         setIsSendingEmail(false);
       } else {
@@ -487,7 +555,11 @@ This is an automated report from the MF King Vehicle Inspection System.
       }
     };
 
-    saveInspection(inspectionRecord);
+    // If no damages, save immediately to history
+    if (!hasDamages()) {
+      saveInspection(inspectionRecord);
+    }
+    // If damages, will save when Send Report is clicked
     setShowSummary(true);
   };
 
@@ -541,6 +613,12 @@ This is an automated report from the MF King Vehicle Inspection System.
   const renderInspection = () => (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4 sticky top-0 bg-white py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 z-10 border-b-2 border-gray-100 shadow-sm">
+        <button
+          onClick={() => setCurrentStep('driver-info')}
+          className="text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          ← Back
+        </button>
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Vehicle Inspection</h2>
         <span className="text-base sm:text-lg font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
           {Object.keys(inspectionData).length}/{inspectionItems.length}
@@ -642,7 +720,16 @@ This is an automated report from the MF King Vehicle Inspection System.
 
   const renderWorkshopSelection = () => (
     <div className="space-y-5">
-      <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setCurrentStep('inspection')}
+          className="text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          ← Back
+        </button>
+        <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
+        <div className="w-16"></div>
+      </div>
       <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
         <p className="text-red-700 font-bold text-base">⚠️ Damages detected - Select one or more workshops</p>
       </div>
@@ -808,7 +895,23 @@ This is an automated report from the MF King Vehicle Inspection System.
 
     return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
+        <div className="flex items-center justify-between">
+          {hasDamages() ? (
+            <button
+              onClick={() => {
+                setShowSummary(false);
+                setCurrentStep('workshop');
+              }}
+              className="text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              ← Back
+            </button>
+          ) : (
+            <div className="w-16"></div>
+          )}
+          <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
+          <div className="w-16"></div>
+        </div>
         
         {hasDamages() ? (
           <div className="space-y-4">
@@ -895,6 +998,9 @@ This is an automated report from the MF King Vehicle Inspection System.
               {emailSent ? (
                 <>
                   <CheckCircle2 size={24} /> Report Sent
+                  {redirectCountdown !== null && (
+                    <span className="ml-2">({redirectCountdown}s)</span>
+                  )}
                 </>
               ) : isSendingEmail ? (
                 <>
@@ -912,24 +1018,13 @@ This is an automated report from the MF King Vehicle Inspection System.
           <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5">
             <h3 className="font-bold text-green-800 text-xl mb-2">✓ All Clear!</h3>
             <p className="text-green-700 text-base">No damages detected. Vehicle is ready for operation.</p>
+            {redirectCountdown !== null && (
+              <p className="text-green-600 text-sm mt-3 font-semibold">
+                Redirecting to start page in {redirectCountdown} second{redirectCountdown !== 1 ? 's' : ''}...
+              </p>
+            )}
           </div>
         )}
-
-        <button
-          onClick={() => {
-            setCurrentStep('driver-info');
-            setInspectionData({});
-            setPhotos({});
-            setNotes({});
-            setSelectedWorkshops([]);
-            setShowSummary(false);
-            setEmailSent(false);
-            setIsSendingEmail(false);
-          }}
-          className="w-full bg-gray-600 text-white py-4 text-lg rounded-xl font-bold hover:bg-gray-700 active:bg-gray-800 transition-colors"
-        >
-          Start New Inspection
-        </button>
       </div>
     );
   };
@@ -1107,6 +1202,9 @@ This is an automated report from the MF King Vehicle Inspection System.
             <h1 className="text-xl sm:text-2xl font-bold text-center text-gray-800">
               Vehicle Pre-Start Inspection
             </h1>
+            <p className="text-sm sm:text-base text-gray-600 text-center mt-2 px-4">
+              Use this checklist to make a quick visual assessment of vehicle condition and generate a report of any issues
+            </p>
           </div>
         </div>
 
