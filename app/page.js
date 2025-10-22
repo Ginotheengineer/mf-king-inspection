@@ -25,6 +25,8 @@ export default function TruckInspectionApp() {
   const [showHistory, setShowHistory] = useState(false);
   const [viewingInspection, setViewingInspection] = useState(null);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [viewingPhotoIndex, setViewingPhotoIndex] = useState(0);
+  const [viewingPhotoArray, setViewingPhotoArray] = useState([]);
   const [workshops, setWorkshops] = useState([]);
   const [showAddWorkshop, setShowAddWorkshop] = useState(false);
   const [editingWorkshop, setEditingWorkshop] = useState(null);
@@ -857,7 +859,11 @@ This is an automated report from the MF King Vehicle Inspection System.
                           )}
                           {photos[item.id] && photos[item.id].length > 0 && (
                             <button
-                              onClick={() => setViewingPhoto(photos[item.id][0])}
+                              onClick={() => {
+                                setViewingPhotoArray(photos[item.id]);
+                                setViewingPhotoIndex(0);
+                                setViewingPhoto(photos[item.id][0]);
+                              }}
                               className="inline-block mt-2 ml-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 active:bg-blue-800 font-semibold"
                             >
                               📷 View Photos ({photos[item.id].length})
@@ -1094,15 +1100,54 @@ This is an automated report from the MF King Vehicle Inspection System.
       {viewingPhoto && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
-          onClick={() => setViewingPhoto(null)}
+          onClick={() => {
+            setViewingPhoto(null);
+            setViewingPhotoArray([]);
+            setViewingPhotoIndex(0);
+          }}
         >
           <div className="relative max-w-4xl max-h-full">
             <button
-              onClick={() => setViewingPhoto(null)}
+              onClick={() => {
+                setViewingPhoto(null);
+                setViewingPhotoArray([]);
+                setViewingPhotoIndex(0);
+              }}
               className="absolute top-4 right-4 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
             >
               ✕
             </button>
+            
+            {viewingPhotoArray.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newIndex = viewingPhotoIndex > 0 ? viewingPhotoIndex - 1 : viewingPhotoArray.length - 1;
+                    setViewingPhotoIndex(newIndex);
+                    setViewingPhoto(viewingPhotoArray[newIndex]);
+                  }}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newIndex = viewingPhotoIndex < viewingPhotoArray.length - 1 ? viewingPhotoIndex + 1 : 0;
+                    setViewingPhotoIndex(newIndex);
+                    setViewingPhoto(viewingPhotoArray[newIndex]);
+                  }}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl hover:bg-gray-200 z-10"
+                >
+                  ›
+                </button>
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                  {viewingPhotoIndex + 1} / {viewingPhotoArray.length}
+                </div>
+              </>
+            )}
+            
             <img 
               src={viewingPhoto} 
               alt="Damage photo" 
