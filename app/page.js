@@ -682,7 +682,6 @@ This is an automated report from the MF King Vehicle Inspection System.
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     multiple
                     onChange={(e) => handlePhotoCapture(item.id, e)}
                     className="hidden"
