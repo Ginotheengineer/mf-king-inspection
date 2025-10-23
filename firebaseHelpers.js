@@ -309,3 +309,97 @@ export const initializeDefaultDrivers = async () => {
     console.error('Error initializing default drivers:', error);
   }
 };
+
+// ============================================
+// VEHICLES
+// ============================================
+
+/**
+ * Save a new vehicle to Firebase
+ * @param {string} vehicleRego - The registration number of the vehicle
+ * @returns {Promise<string>} The ID of the saved vehicle
+ */
+export const saveVehicleToFirebase = async (vehicleRego) => {
+  try {
+    const docRef = await addDoc(collection(db, 'vehicles'), {
+      rego: vehicleRego.toUpperCase(),
+      createdAt: new Date().toISOString()
+    });
+    console.log('Vehicle saved with ID:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error saving vehicle:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load all vehicles from Firebase
+ * @returns {Promise<Array>} Array of vehicle objects
+ */
+export const loadVehiclesFromFirebase = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'vehicles'));
+    const vehicles = [];
+    
+    querySnapshot.forEach((doc) => {
+      vehicles.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    console.log('Loaded vehicles:', vehicles.length);
+    return vehicles;
+  } catch (error) {
+    console.error('Error loading vehicles:', error);
+    return [];
+  }
+};
+
+/**
+ * Delete a vehicle from Firebase
+ * @param {string} vehicleId - The ID of the vehicle to delete
+ */
+export const deleteVehicleFromFirebase = async (vehicleId) => {
+  try {
+    await deleteDoc(doc(db, 'vehicles', vehicleId));
+    console.log('Vehicle deleted:', vehicleId);
+  } catch (error) {
+    console.error('Error deleting vehicle:', error);
+    throw error;
+  }
+};
+
+/**
+ * Listen to real-time vehicle updates
+ * @param {Function} callback - Function to call when vehicles change
+ * @returns {Function} Unsubscribe function
+ */
+export const subscribeToVehicles = (callback) => {
+  return onSnapshot(collection(db, 'vehicles'), (querySnapshot) => {
+    const vehicles = [];
+    querySnapshot.forEach((doc) => {
+      vehicles.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    callback(vehicles);
+  });
+};
+
+/**
+ * Initialize default vehicles if none exist
+ */
+export const initializeDefaultVehicles = async () => {
+  try {
+    const vehicles = await loadVehiclesFromFirebase();
+    if (vehicles.length === 0) {
+      await saveVehicleToFirebase('ABC123');
+      console.log('Default vehicle created');
+    }
+  } catch (error) {
+    console.error('Error initializing default vehicles:', error);
+  }
+};

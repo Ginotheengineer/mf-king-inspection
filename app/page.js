@@ -17,7 +17,12 @@ import {
   deleteWorkshopFromFirebase,
   subscribeToWorkshops,
   initializeDefaultWorkshop,
-  initializeDefaultDrivers
+  initializeDefaultDrivers,
+  saveVehicleToFirebase,
+  loadVehiclesFromFirebase,
+  deleteVehicleFromFirebase,
+  subscribeToVehicles,
+  initializeDefaultVehicles
 } from '../firebaseHelpers';
 
 export default function TruckInspectionApp() {
@@ -58,6 +63,11 @@ export default function TruckInspectionApp() {
   const [showManageDrivers, setShowManageDrivers] = useState(false);
   const [newDriverName, setNewDriverName] = useState('');
   const [driverToDelete, setDriverToDelete] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [showAddVehicle, setShowAddVehicle] = useState(false);
+  const [showManageVehicles, setShowManageVehicles] = useState(false);
+  const [newVehicleRego, setNewVehicleRego] = useState('');
+  const [vehicleToDelete, setVehicleToDelete] = useState(null);
   const [isCompletingInspection, setIsCompletingInspection] = useState(false);
   const [historySearchTruck, setHistorySearchTruck] = useState('');
   const [historySearchDriver, setHistorySearchDriver] = useState('');
@@ -78,6 +88,8 @@ export default function TruckInspectionApp() {
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
   const [firstPageDriverDropdownOpen, setFirstPageDriverDropdownOpen] = useState(false);
   const [firstPageDriverSearchTerm, setFirstPageDriverSearchTerm] = useState('');
+  const [firstPageVehicleDropdownOpen, setFirstPageVehicleDropdownOpen] = useState(false);
+  const [firstPageVehicleSearchTerm, setFirstPageVehicleSearchTerm] = useState('');
 
   // Helper functions for custom modals
   const showAlert = (title, message) => {
@@ -131,6 +143,7 @@ export default function TruckInspectionApp() {
         // Initialize default data if collections are empty
         await initializeDefaultWorkshop();
         await initializeDefaultDrivers();
+        await initializeDefaultVehicles();
         
         // Load initial data from Firebase
         const loadedInspections = await loadInspectionsFromFirebase();
@@ -171,6 +184,9 @@ export default function TruckInspectionApp() {
         const loadedDrivers = await loadDriversFromFirebase();
         setDrivers(loadedDrivers);
         
+        const loadedVehicles = await loadVehiclesFromFirebase();
+        setVehicles(loadedVehicles);
+        
         console.log('✅ Firebase initialized successfully!');
         console.log(`   📋 Loaded inspections`);
         console.log(`   👤 Loaded ${loadedDrivers.length} drivers`);
@@ -198,12 +214,18 @@ export default function TruckInspectionApp() {
       setWorkshops(workshops);
     });
     
+    const unsubscribeVehicles = subscribeToVehicles((vehicles) => {
+      console.log('🔄 Real-time update: Vehicles changed');
+      setVehicles(vehicles);
+    });
+    
     // Cleanup function - unsubscribe from listeners when component unmounts
     return () => {
       console.log('🧹 Cleaning up Firebase listeners');
       unsubscribeInspections();
       unsubscribeDrivers();
       unsubscribeWorkshops();
+      unsubscribeVehicles();
     };
   }, []);
 
@@ -272,6 +294,33 @@ export default function TruckInspectionApp() {
     } catch (error) {
       console.error('❌ Error deleting driver:', error);
       showAlert('Error', 'Failed to delete driver. Please try again.');
+    }
+  };
+
+  const saveVehicle = async (vehicleRego) => {
+    try {
+      await saveVehicleToFirebase(vehicleRego);
+      console.log('✅ Vehicle saved successfully:', vehicleRego);
+    } catch (error) {
+      console.error('❌ Error saving vehicle:', error);
+      showAlert('Error', 'Failed to add vehicle. Please try again.');
+    }
+  };
+
+  const deleteVehicle = async (vehicleId) => {
+    console.log('Attempting to delete vehicle:', vehicleId);
+    
+    if (vehicles.length === 1) {
+      showAlert('Cannot Delete', 'Cannot delete the last vehicle. At least one vehicle must remain.');
+      return;
+    }
+
+    try {
+      await deleteVehicleFromFirebase(vehicleId);
+      console.log('✅ Vehicle deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting vehicle:', error);
+      showAlert('Error', 'Failed to delete vehicle. Please try again.');
     }
   };
 
@@ -753,23 +802,85 @@ This is an automated report from the MF King Vehicle Inspection System.
           </div>
         </div>
         <div>
-          <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">Vehicle Registration Number</label>
-          <input
-            type="text"
-            value={driverInfo.truckNumber}
-            onChange={(e) => setDriverInfo(prev => ({ ...prev, truckNumber: e.target.value.toUpperCase() }))}
-            className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 uppercase"
-            placeholder="e.g., ABC123"
-          />
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm sm:text-base font-medium text-gray-700">Vehicle Registration Number</label>
+            <button
+              onClick={() => setShowManageVehicles(true)}
+              className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Manage Vehicles
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={firstPageVehicleDropdownOpen ? firstPageVehicleSearchTerm : driverInfo.truckNumber}
+              onChange={(e) => {
+                setFirstPageVehicleSearchTerm(e.target.value.toUpperCase());
+                setFirstPageVehicleDropdownOpen(true);
+              }}
+              onFocus={() => {
+                setFirstPageVehicleDropdownOpen(true);
+                setFirstPageVehicleSearchTerm('');
+              }}
+              placeholder="e.g., ABC123"
+              className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 uppercase"
+            />
+            {firstPageVehicleDropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => {
+                    setFirstPageVehicleDropdownOpen(false);
+                    setFirstPageVehicleSearchTerm('');
+                  }}
+                />
+                <div className="absolute z-20 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {vehicles
+                    .filter(vehicle => 
+                      vehicle.rego.includes(firstPageVehicleSearchTerm)
+                    )
+                    .map((vehicle) => (
+                      <div
+                        key={vehicle.id}
+                        onClick={() => {
+                          setDriverInfo(prev => ({ ...prev, truckNumber: vehicle.rego }));
+                          setFirstPageVehicleDropdownOpen(false);
+                          setFirstPageVehicleSearchTerm('');
+                        }}
+                        className="px-3 py-3 hover:bg-blue-50 cursor-pointer text-sm sm:text-base border-b border-gray-100 last:border-b-0"
+                      >
+                        {vehicle.rego}
+                      </div>
+                    ))}
+                  {vehicles.filter(vehicle => 
+                    vehicle.rego.includes(firstPageVehicleSearchTerm)
+                  ).length === 0 && firstPageVehicleSearchTerm && (
+                    <div className="px-3 py-3 text-sm text-gray-500 italic">
+                      No vehicles found matching "{firstPageVehicleSearchTerm}"
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
       <button
         onClick={() => {
           const driverExists = drivers.some(driver => driver.name === driverInfo.name);
+          const vehicleExists = vehicles.some(vehicle => vehicle.rego === driverInfo.truckNumber);
+          
           if (!driverExists) {
             showAlert('Invalid Driver', 'Please select a valid driver name from the list.');
             return;
           }
+          
+          if (!vehicleExists) {
+            showAlert('Invalid Vehicle', 'Please select a valid vehicle registration number from the list.');
+            return;
+          }
+          
           setCurrentStep('inspection');
         }}
         disabled={!driverInfo.name || !driverInfo.truckNumber}
@@ -1818,6 +1929,130 @@ This is an automated report from the MF King Vehicle Inspection System.
               </button>
               <button
                 onClick={() => setDriverToDelete(null)}
+                className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Vehicles Modal */}
+      {showManageVehicles && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowManageVehicles(false)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Manage Vehicles</h3>
+              <button
+                onClick={() => setShowManageVehicles(false)}
+                className="text-gray-600 hover:text-gray-800 font-bold text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              {vehicles.map((vehicle) => (
+                <div key={vehicle.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                  <span className="font-semibold text-gray-800 uppercase">{vehicle.rego}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setVehicleToDelete(vehicle);
+                    }}
+                    className="text-red-600 hover:text-red-800 font-semibold text-sm px-3 py-1 bg-red-100 rounded hover:bg-red-200"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {!showAddVehicle ? (
+              <button
+                onClick={() => setShowAddVehicle(true)}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+              >
+                + Add Vehicle
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={newVehicleRego}
+                  onChange={(e) => setNewVehicleRego(e.target.value.toUpperCase())}
+                  placeholder="Enter registration number..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none uppercase"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (newVehicleRego.trim()) {
+                        saveVehicle(newVehicleRego.trim());
+                        setNewVehicleRego('');
+                        setShowAddVehicle(false);
+                      } else {
+                        showAlert('Missing Information', 'Please enter a registration number');
+                      }
+                    }}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewVehicleRego('');
+                      setShowAddVehicle(false);
+                    }}
+                    className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Vehicle Delete Confirmation Modal */}
+      {vehicleToDelete && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          style={{zIndex: 9999}}
+          onClick={() => setVehicleToDelete(null)}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-3">Delete Vehicle?</h3>
+            <p className="text-gray-700 mb-2">
+              Are you sure you want to delete:
+            </p>
+            <p className="font-semibold text-gray-900 mb-6 uppercase">
+              "{vehicleToDelete.rego}"
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  deleteVehicle(vehicleToDelete.id);
+                  setVehicleToDelete(null);
+                }}
+                className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setVehicleToDelete(null)}
                 className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
               >
                 Cancel
