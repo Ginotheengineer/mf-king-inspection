@@ -236,6 +236,7 @@ export default function TruckInspectionApp() {
       // Remove from selected workshops if it was selected
       setSelectedWorkshops(prev => prev.filter(id => id !== workshopId));
       setWorkshopToDelete(null);
+      setEditingWorkshop(null); // Clear editing state
       console.log('✅ Workshop deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting workshop:', error);
@@ -857,9 +858,16 @@ This is an automated report from the MF King Vehicle Inspection System.
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (editingWorkshop.name && editingWorkshop.email) {
-                        updateWorkshop(editingWorkshop.id, { name: editingWorkshop.name, email: editingWorkshop.email });
+                        try {
+                          await updateWorkshopInFirebase(editingWorkshop.id, { name: editingWorkshop.name, email: editingWorkshop.email });
+                          setEditingWorkshop(null);
+                          console.log('✅ Workshop updated successfully');
+                        } catch (error) {
+                          console.error('❌ Error updating workshop:', error);
+                          alert('❌ Failed to update workshop. Please try again.');
+                        }
                       } else {
                         alert('Please fill in both workshop name and email');
                       }
