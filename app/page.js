@@ -76,6 +76,8 @@ export default function TruckInspectionApp() {
   // Driver dropdown search state
   const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
   const [driverSearchTerm, setDriverSearchTerm] = useState('');
+  const [firstPageDriverDropdownOpen, setFirstPageDriverDropdownOpen] = useState(false);
+  const [firstPageDriverSearchTerm, setFirstPageDriverSearchTerm] = useState('');
 
   // Helper functions for custom modals
   const showAlert = (title, message) => {
@@ -696,16 +698,59 @@ This is an automated report from the MF King Vehicle Inspection System.
               Manage Drivers
             </button>
           </div>
-          <select
-            value={driverInfo.name}
-            onChange={(e) => setDriverInfo(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
-          >
-            <option value="">Select driver</option>
-            {drivers.map((driver) => (
-              <option key={driver.id} value={driver.name}>{driver.name}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={firstPageDriverDropdownOpen ? firstPageDriverSearchTerm : driverInfo.name}
+              onChange={(e) => {
+                setFirstPageDriverSearchTerm(e.target.value);
+                setFirstPageDriverDropdownOpen(true);
+              }}
+              onFocus={() => {
+                setFirstPageDriverDropdownOpen(true);
+                setFirstPageDriverSearchTerm('');
+              }}
+              placeholder="Select driver"
+              className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+            />
+            {firstPageDriverDropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => {
+                    setFirstPageDriverDropdownOpen(false);
+                    setFirstPageDriverSearchTerm('');
+                  }}
+                />
+                <div className="absolute z-20 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {drivers
+                    .filter(driver => 
+                      driver.name.toLowerCase().includes(firstPageDriverSearchTerm.toLowerCase())
+                    )
+                    .map((driver) => (
+                      <div
+                        key={driver.id}
+                        onClick={() => {
+                          setDriverInfo(prev => ({ ...prev, name: driver.name }));
+                          setFirstPageDriverDropdownOpen(false);
+                          setFirstPageDriverSearchTerm('');
+                        }}
+                        className="px-3 py-3 hover:bg-blue-50 cursor-pointer text-sm sm:text-base border-b border-gray-100 last:border-b-0"
+                      >
+                        {driver.name}
+                      </div>
+                    ))}
+                  {drivers.filter(driver => 
+                    driver.name.toLowerCase().includes(firstPageDriverSearchTerm.toLowerCase())
+                  ).length === 0 && firstPageDriverSearchTerm && (
+                    <div className="px-3 py-3 text-sm text-gray-500 italic">
+                      No drivers found matching "{firstPageDriverSearchTerm}"
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <div>
           <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">Vehicle Registration Number</label>
@@ -719,7 +764,14 @@ This is an automated report from the MF King Vehicle Inspection System.
         </div>
       </div>
       <button
-        onClick={() => setCurrentStep('inspection')}
+        onClick={() => {
+          const driverExists = drivers.some(driver => driver.name === driverInfo.name);
+          if (!driverExists) {
+            showAlert('Invalid Driver', 'Please select a valid driver name from the list.');
+            return;
+          }
+          setCurrentStep('inspection');
+        }}
         disabled={!driverInfo.name || !driverInfo.truckNumber}
         className="w-full mt-4 bg-red-600 text-white py-3 text-base sm:text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
