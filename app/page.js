@@ -1497,7 +1497,7 @@ This is an automated report from the MF King Vehicle Inspection System.
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  deleteWorkshop(workshopToDelete);
+                  deleteWorkshop(workshopToDelete.id);
                 }}
                 className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
               >
