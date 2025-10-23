@@ -72,6 +72,10 @@ export default function TruckInspectionApp() {
     confirmText: 'OK',
     cancelText: 'Cancel'
   });
+  
+  // Driver dropdown search state
+  const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
+  const [driverSearchTerm, setDriverSearchTerm] = useState('');
 
   // Helper functions for custom modals
   const showAlert = (title, message) => {
@@ -1343,19 +1347,69 @@ This is an automated report from the MF King Vehicle Inspection System.
               <User size={16} className="text-gray-600" />
               Filter by Driver Name
             </label>
-            <input
-              type="text"
-              value={historySearchDriver}
-              onChange={(e) => setHistorySearchDriver(e.target.value)}
-              placeholder="Enter Driver Name"
-              list="driver-suggestions"
-              className="w-full px-3 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            />
-            <datalist id="driver-suggestions">
-              {drivers.map((driver) => (
-                <option key={driver.id} value={driver.name} />
-              ))}
-            </datalist>
+            <div className="relative">
+              <input
+                type="text"
+                value={driverDropdownOpen ? driverSearchTerm : historySearchDriver}
+                onChange={(e) => {
+                  setDriverSearchTerm(e.target.value);
+                  setDriverDropdownOpen(true);
+                }}
+                onFocus={() => {
+                  setDriverDropdownOpen(true);
+                  setDriverSearchTerm('');
+                }}
+                placeholder="Enter Driver Name"
+                className="w-full px-3 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              />
+              {driverDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => {
+                      setDriverDropdownOpen(false);
+                      setDriverSearchTerm('');
+                    }}
+                  />
+                  <div className="absolute z-20 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div
+                      onClick={() => {
+                        setHistorySearchDriver('');
+                        setDriverDropdownOpen(false);
+                        setDriverSearchTerm('');
+                      }}
+                      className="px-3 py-3 hover:bg-gray-100 cursor-pointer text-sm text-gray-500 border-b border-gray-200"
+                    >
+                      All Drivers
+                    </div>
+                    {drivers
+                      .filter(driver => 
+                        driver.name.toLowerCase().includes(driverSearchTerm.toLowerCase())
+                      )
+                      .map((driver) => (
+                        <div
+                          key={driver.id}
+                          onClick={() => {
+                            setHistorySearchDriver(driver.name);
+                            setDriverDropdownOpen(false);
+                            setDriverSearchTerm('');
+                          }}
+                          className="px-3 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-b-0"
+                        >
+                          {driver.name}
+                        </div>
+                      ))}
+                    {drivers.filter(driver => 
+                      driver.name.toLowerCase().includes(driverSearchTerm.toLowerCase())
+                    ).length === 0 && driverSearchTerm && (
+                      <div className="px-3 py-3 text-sm text-gray-500 italic">
+                        No drivers found matching "{driverSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           
           {(historySearchTruck || historySearchDriver) && (
