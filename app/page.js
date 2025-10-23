@@ -685,9 +685,9 @@ This is an automated report from the MF King Vehicle Inspection System.
       {savedInspections.length > 0 && (
         <button
           onClick={() => setShowHistory(true)}
-          className="w-full mt-3 bg-gray-600 text-white py-4 text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-700 active:bg-gray-800 transition-colors"
+          className="w-full mt-3 bg-gray-600 text-white py-3 text-base sm:text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-700 active:bg-gray-800 transition-colors"
         >
-          <History size={22} /> View History ({savedInspections.length})
+          <History size={20} className="sm:hidden" /><History size={22} className="hidden sm:block" /> View History ({savedInspections.length})
         </button>
       )}
     </div>
@@ -748,20 +748,20 @@ This is an automated report from the MF King Vehicle Inspection System.
             <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={() => handleInspectionAnswer(item.id, 'pass')}
-                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-all ${
+                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-colors duration-100 touch-manipulation ${
                   inspectionData[item.id] === 'pass'
-                    ? 'bg-green-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 active:bg-gray-300'
                 }`}
               >
                 <CheckCircle2 size={20} className="sm:hidden" /><CheckCircle2 size={24} className="hidden sm:block" /> Pass
               </button>
               <button
                 onClick={() => handleInspectionAnswer(item.id, 'fail')}
-                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-all ${
+                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-colors duration-100 touch-manipulation ${
                   inspectionData[item.id] === 'fail'
-                    ? 'bg-red-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+                    ? 'bg-red-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 active:bg-gray-300'
                 }`}
               >
                 <XCircle size={20} className="sm:hidden" /><XCircle size={24} className="hidden sm:block" /> Fail
@@ -840,15 +840,15 @@ This is an automated report from the MF King Vehicle Inspection System.
 
   const renderWorkshopSelection = () => (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => setCurrentStep('inspection')}
-          className="text-blue-600 hover:text-blue-800 font-semibold"
+          className="text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base whitespace-nowrap"
         >
           ← Back
         </button>
-        <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
-        <div className="w-16"></div>
+        <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 text-center">Select Workshop(s)</h2>
+        <div className="w-12 sm:w-16"></div>
       </div>
       <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
         <p className="text-red-700 font-bold text-base">⚠️ Damages detected - Select one or more workshops</p>
@@ -1015,22 +1015,22 @@ This is an automated report from the MF King Vehicle Inspection System.
 
     return (
       <div className="space-y-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {hasDamages() ? (
             <button
               onClick={() => {
                 setShowSummary(false);
                 setCurrentStep('workshop');
               }}
-              className="text-blue-600 hover:text-blue-800 font-semibold"
+              className="text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base whitespace-nowrap"
             >
               ← Back
             </button>
           ) : (
-            <div className="w-16"></div>
+            <div className="w-12 sm:w-16"></div>
           )}
-          <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
-          <div className="w-16"></div>
+          <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 text-center">Inspection Summary</h2>
+          <div className="w-12 sm:w-16"></div>
         </div>
         
         {hasDamages() ? (
