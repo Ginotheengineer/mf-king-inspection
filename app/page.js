@@ -61,6 +61,46 @@ export default function TruckInspectionApp() {
   const [isCompletingInspection, setIsCompletingInspection] = useState(false);
   const [historySearchTruck, setHistorySearchTruck] = useState('');
   const [historySearchDriver, setHistorySearchDriver] = useState('');
+  
+  // Custom modal states
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    type: 'alert', // 'alert' or 'confirm'
+    title: '',
+    message: '',
+    onConfirm: null,
+    confirmText: 'OK',
+    cancelText: 'Cancel'
+  });
+
+  // Helper functions for custom modals
+  const showAlert = (title, message) => {
+    setModalState({
+      isOpen: true,
+      type: 'alert',
+      title,
+      message,
+      onConfirm: null,
+      confirmText: 'OK',
+      cancelText: 'Cancel'
+    });
+  };
+
+  const showConfirm = (title, message, onConfirm, confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setModalState({
+      isOpen: true,
+      type: 'confirm',
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      cancelText
+    });
+  };
+
+  const closeModal = () => {
+    setModalState(prev => ({ ...prev, isOpen: false }));
+  };
 
 
   const inspectionItems = [
@@ -88,7 +128,28 @@ export default function TruckInspectionApp() {
         
         // Load initial data from Firebase
         const loadedInspections = await loadInspectionsFromFirebase();
-        setSavedInspections(loadedInspections);
+        
+        // Auto-delete inspections older than 1 year
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        
+        const oldInspections = loadedInspections.filter(inspection => {
+          const inspectionDate = new Date(inspection.timestamp);
+          return inspectionDate < oneYearAgo;
+        });
+        
+        if (oldInspections.length > 0) {
+          console.log(`🗑️ Auto-deleting ${oldInspections.length} inspections older than 1 year...`);
+          for (const inspection of oldInspections) {
+            await deleteInspectionFromFirebase(inspection.id);
+          }
+          console.log('✅ Old inspections deleted');
+          // Reload inspections after cleanup
+          const cleanedInspections = await loadInspectionsFromFirebase();
+          setSavedInspections(cleanedInspections);
+        } else {
+          setSavedInspections(loadedInspections);
+        }
         
         const loadedWorkshops = await loadWorkshopsFromFirebase();
         setWorkshops(loadedWorkshops);
@@ -97,12 +158,12 @@ export default function TruckInspectionApp() {
         setDrivers(loadedDrivers);
         
         console.log('✅ Firebase initialized successfully!');
-        console.log(`   📋 Loaded ${loadedInspections.length} inspections`);
+        console.log(`   📋 Loaded ${loadedInspections.length - oldInspections.length} inspections`);
         console.log(`   👤 Loaded ${loadedDrivers.length} drivers`);
         console.log(`   🔧 Loaded ${loadedWorkshops.length} workshops`);
       } catch (error) {
         console.error('❌ Error initializing Firebase:', error);
-        alert('Failed to connect to database. Please check your internet connection and Firebase configuration.');
+        showAlert('Connection Error', 'Failed to connect to database. Please check your internet connection and Firebase configuration.');
       }
     };
     
@@ -180,7 +241,7 @@ export default function TruckInspectionApp() {
       console.log('✅ Driver saved successfully:', driverName);
     } catch (error) {
       console.error('❌ Error saving driver:', error);
-      alert('❌ Failed to add driver. Please try again.');
+      showAlert('Error', 'Failed to add driver. Please try again.');
     }
   };
 
@@ -188,7 +249,7 @@ export default function TruckInspectionApp() {
     console.log('Attempting to delete driver:', driverId);
     
     if (drivers.length === 1) {
-      alert('❌ Cannot delete the last driver. At least one driver must remain.');
+      showAlert('Cannot Delete', 'Cannot delete the last driver. At least one driver must remain.');
       return;
     }
 
@@ -197,13 +258,13 @@ export default function TruckInspectionApp() {
       console.log('✅ Driver deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting driver:', error);
-      alert('❌ Failed to delete driver. Please try again.');
+      showAlert('Error', 'Failed to delete driver. Please try again.');
     }
   };
 
   const saveWorkshop = async () => {
     if (!newWorkshop.name || !newWorkshop.email) {
-      alert('Please enter both name and email');
+      showAlert('Missing Information', 'Please enter both name and email');
       return;
     }
     
@@ -221,13 +282,13 @@ export default function TruckInspectionApp() {
       setShowAddWorkshop(false);
     } catch (error) {
       console.error('❌ Error saving workshop:', error);
-      alert('❌ Failed to save workshop. Please try again.');
+      showAlert('Error', 'Failed to save workshop. Please try again.');
     }
   };
 
   const deleteWorkshop = async (workshopId) => {
     if (workshops.length === 1) {
-      alert('❌ Cannot delete the last workshop. At least one workshop must remain.');
+      showAlert('Cannot Delete', 'Cannot delete the last workshop. At least one workshop must remain.');
       return;
     }
     
@@ -240,7 +301,7 @@ export default function TruckInspectionApp() {
       console.log('✅ Workshop deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting workshop:', error);
-      alert('❌ Failed to delete workshop. Please try again.');
+      showAlert('Error', 'Failed to delete workshop. Please try again.');
     }
   };
 
@@ -260,20 +321,27 @@ export default function TruckInspectionApp() {
       console.log('✅ Inspection saved successfully');
     } catch (error) {
       console.error('❌ Error saving inspection:', error);
-      alert('Failed to save inspection. Please try again.');
+      showAlert('Error', 'Failed to save inspection. Please try again.');
     }
   };
 
   const deleteInspection = async (id) => {
-    if (window.confirm('Are you sure you want to delete this inspection?')) {
-      try {
-        await deleteInspectionFromFirebase(id);
-        console.log('✅ Inspection deleted successfully');
-      } catch (error) {
-        console.error('❌ Error deleting inspection:', error);
-        alert('Failed to delete inspection. Please try again.');
-      }
-    }
+    showConfirm(
+      'Delete Inspection',
+      'Are you sure you want to delete this inspection? This action cannot be undone.',
+      async () => {
+        try {
+          await deleteInspectionFromFirebase(id);
+          console.log('✅ Inspection deleted successfully');
+          closeModal();
+        } catch (error) {
+          console.error('❌ Error deleting inspection:', error);
+          showAlert('Error', 'Failed to delete inspection. Please try again.');
+        }
+      },
+      'Delete',
+      'Cancel'
+    );
   };
 
   const handleInspectionAnswer = (itemId, value) => {
@@ -555,7 +623,7 @@ This is an automated report from the MF King Vehicle Inspection System.
       }
     } catch (error) {
       setIsSendingEmail(false);
-      alert('❌ Failed to send email. Please check your internet connection or contact support.');
+      showAlert('Email Error', 'Failed to send email. Please check your internet connection or contact support.');
       console.error('Email error:', error);
     }
   };
@@ -866,10 +934,10 @@ This is an automated report from the MF King Vehicle Inspection System.
                           console.log('✅ Workshop updated successfully');
                         } catch (error) {
                           console.error('❌ Error updating workshop:', error);
-                          alert('❌ Failed to update workshop. Please try again.');
+                          showAlert('Error', 'Failed to update workshop. Please try again.');
                         }
                       } else {
-                        alert('Please fill in both workshop name and email');
+                        showAlert('Missing Information', 'Please fill in both workshop name and email');
                       }
                     }}
                     className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800"
@@ -955,7 +1023,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                 if (newWorkshop.name && newWorkshop.email) {
                   saveWorkshop(newWorkshop);
                 } else {
-                  alert('Please fill in both workshop name and email');
+                  showAlert('Missing Information', 'Please fill in both workshop name and email');
                 }
               }}
               disabled={!newWorkshop.name || !newWorkshop.email}
@@ -1584,7 +1652,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                         setNewDriverName('');
                         setShowAddDriver(false);
                       } else {
-                        alert('Please enter a driver name');
+                        showAlert('Missing Information', 'Please enter a driver name');
                       }
                     }}
                     className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
@@ -1641,6 +1709,54 @@ This is an automated report from the MF King Vehicle Inspection System.
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Modal for Alerts and Confirmations */}
+      {modalState.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => modalState.type === 'alert' ? closeModal() : null}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-3">{modalState.title}</h3>
+            <p className="text-gray-700 mb-6 whitespace-pre-line">
+              {modalState.message}
+            </p>
+            <div className="flex gap-3">
+              {modalState.type === 'confirm' && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (modalState.onConfirm) {
+                        modalState.onConfirm();
+                      }
+                    }}
+                    className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+                  >
+                    {modalState.confirmText}
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+                  >
+                    {modalState.cancelText}
+                  </button>
+                </>
+              )}
+              {modalState.type === 'alert' && (
+                <button
+                  onClick={closeModal}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800"
+                >
+                  {modalState.confirmText}
+                </button>
+              )}
             </div>
           </div>
         </div>
