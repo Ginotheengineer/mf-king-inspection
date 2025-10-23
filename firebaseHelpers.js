@@ -334,13 +334,17 @@ export const initializeDefaultDrivers = async () => {
 
 /**
  * Save a new vehicle to Firebase
- * @param {string} vehicleRego - The registration number of the vehicle
+ * @param {Object} vehicleData - Object with rego and optional reminders
  * @returns {Promise<string>} The ID of the saved vehicle
  */
-export const saveVehicleToFirebase = async (vehicleRego) => {
+export const saveVehicleToFirebase = async (vehicleData) => {
   try {
     const docRef = await addDoc(collection(db, 'vehicles'), {
-      rego: vehicleRego.toUpperCase(),
+      rego: typeof vehicleData === 'string' ? vehicleData.toUpperCase() : vehicleData.rego.toUpperCase(),
+      wofExpiry: vehicleData.wofExpiry || null,
+      coFExpiry: vehicleData.coFExpiry || null,
+      regoExpiry: vehicleData.regoExpiry || null,
+      serviceDate: vehicleData.serviceDate || null,
       createdAt: new Date().toISOString()
     });
     console.log('Vehicle saved with ID:', docRef.id);
@@ -390,6 +394,28 @@ export const deleteVehicleFromFirebase = async (vehicleId) => {
 };
 
 /**
+ * Update a vehicle in Firebase
+ * @param {string} vehicleId - The ID of the vehicle to update
+ * @param {Object} vehicleData - Object with rego and reminder dates
+ */
+export const updateVehicleInFirebase = async (vehicleId, vehicleData) => {
+  try {
+    await updateDoc(doc(db, 'vehicles', vehicleId), {
+      rego: vehicleData.rego.toUpperCase(),
+      wofExpiry: vehicleData.wofExpiry || null,
+      coFExpiry: vehicleData.coFExpiry || null,
+      regoExpiry: vehicleData.regoExpiry || null,
+      serviceDate: vehicleData.serviceDate || null,
+      updatedAt: new Date().toISOString()
+    });
+    console.log('Vehicle updated:', vehicleId);
+  } catch (error) {
+    console.error('Error updating vehicle:', error);
+    throw error;
+  }
+};
+
+/**
  * Listen to real-time vehicle updates
  * @param {Function} callback - Function to call when vehicles change
  * @returns {Function} Unsubscribe function
@@ -414,7 +440,7 @@ export const initializeDefaultVehicles = async () => {
   try {
     const vehicles = await loadVehiclesFromFirebase();
     if (vehicles.length === 0) {
-      await saveVehicleToFirebase('ABC123');
+      await saveVehicleToFirebase({ rego: 'ABC123' });
       console.log('Default vehicle created');
     }
   } catch (error) {

@@ -22,6 +22,7 @@ import {
   saveVehicleToFirebase,
   loadVehiclesFromFirebase,
   deleteVehicleFromFirebase,
+  updateVehicleInFirebase,
   subscribeToVehicles,
   initializeDefaultVehicles
 } from '../firebaseHelpers';
@@ -70,6 +71,7 @@ export default function TruckInspectionApp() {
   const [showManageVehicles, setShowManageVehicles] = useState(false);
   const [newVehicleRego, setNewVehicleRego] = useState('');
   const [vehicleToDelete, setVehicleToDelete] = useState(null);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const [isCompletingInspection, setIsCompletingInspection] = useState(false);
   const [historySearchTruck, setHistorySearchTruck] = useState('');
   const [historySearchDriver, setHistorySearchDriver] = useState('');
@@ -302,10 +304,10 @@ export default function TruckInspectionApp() {
     }
   };
 
-  const saveVehicle = async (vehicleRego) => {
+  const saveVehicle = async (vehicleData) => {
     try {
-      await saveVehicleToFirebase(vehicleRego);
-      console.log('✅ Vehicle saved successfully:', vehicleRego);
+      await saveVehicleToFirebase(vehicleData);
+      console.log('✅ Vehicle saved successfully:', vehicleData.rego);
     } catch (error) {
       console.error('❌ Error saving vehicle:', error);
       showAlert('Error', 'Failed to add vehicle. Please try again.');
@@ -322,6 +324,7 @@ export default function TruckInspectionApp() {
 
     try {
       await deleteVehicleFromFirebase(vehicleId);
+      setEditingVehicle(null);
       console.log('✅ Vehicle deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting vehicle:', error);
@@ -2075,29 +2078,138 @@ This is an automated report from the MF King Vehicle Inspection System.
 
             <div className="space-y-3 mb-4">
               {vehicles.map((vehicle) => (
-                <div key={vehicle.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                  <span className="font-semibold text-gray-800 uppercase">{vehicle.rego}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setVehicleToDelete(vehicle);
-                    }}
-                    className="text-red-600 hover:text-red-800 font-semibold text-sm px-3 py-1 bg-red-100 rounded hover:bg-red-200"
-                  >
-                    Delete
-                  </button>
+                <div key={vehicle.id}>
+                  {editingVehicle?.id === vehicle.id ? (
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 space-y-3">
+                      <h3 className="font-bold text-gray-800">Edit Vehicle</h3>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Registration Number</label>
+                        <input
+                          type="text"
+                          value={editingVehicle.rego}
+                          onChange={(e) => setEditingVehicle(prev => ({ ...prev, rego: e.target.value.toUpperCase() }))}
+                          className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+                        />
+                      </div>
+                      
+                      <div className="border-t pt-3 mt-3">
+                        <h4 className="font-semibold text-gray-700 mb-2">Service Reminders</h4>
+                        <p className="text-xs text-gray-600 mb-3">You'll receive email reminders at 3 months and 1 month before each expiry date</p>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">WOF Expiry Date</label>
+                            <input
+                              type="date"
+                              value={editingVehicle.wofExpiry || ''}
+                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, wofExpiry: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">CoF Expiry Date</label>
+                            <input
+                              type="date"
+                              value={editingVehicle.coFExpiry || ''}
+                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, coFExpiry: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Registration Expiry Date</label>
+                            <input
+                              type="date"
+                              value={editingVehicle.regoExpiry || ''}
+                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, regoExpiry: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Next Service Due Date</label>
+                            <input
+                              type="date"
+                              value={editingVehicle.serviceDate || ''}
+                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, serviceDate: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (editingVehicle.rego.trim()) {
+                              try {
+                                await updateVehicleInFirebase(editingVehicle.id, editingVehicle);
+                                setEditingVehicle(null);
+                                console.log('✅ Vehicle updated successfully');
+                              } catch (error) {
+                                console.error('❌ Error updating vehicle:', error);
+                                showAlert('Error', 'Failed to update vehicle. Please try again.');
+                              }
+                            } else {
+                              showAlert('Missing Information', 'Please enter a registration number');
+                            }
+                          }}
+                          className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => setVehicleToDelete(editingVehicle)}
+                          className="flex-1 bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setEditingVehicle(null)}
+                          className="px-4 bg-gray-600 text-white py-2 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <span className="font-semibold text-gray-800 uppercase">{vehicle.rego}</span>
+                        {!editingVehicle && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingVehicle({ 
+                                id: vehicle.id, 
+                                rego: vehicle.rego,
+                                wofExpiry: vehicle.wofExpiry || '',
+                                coFExpiry: vehicle.coFExpiry || '',
+                                regoExpiry: vehicle.regoExpiry || '',
+                                serviceDate: vehicle.serviceDate || ''
+                              });
+                            }}
+                            className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
-            {!showAddVehicle ? (
+            {!showAddVehicle && !editingVehicle ? (
               <button
                 onClick={() => setShowAddVehicle(true)}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
               >
                 + Add Vehicle
               </button>
-            ) : (
+            ) : showAddVehicle && !editingVehicle ? (
               <div className="space-y-3">
                 <input
                   type="text"
@@ -2111,7 +2223,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                   <button
                     onClick={() => {
                       if (newVehicleRego.trim()) {
-                        saveVehicle(newVehicleRego.trim());
+                        saveVehicle({ rego: newVehicleRego.trim() });
                         setNewVehicleRego('');
                         setShowAddVehicle(false);
                       } else {
@@ -2133,7 +2245,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
