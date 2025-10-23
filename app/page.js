@@ -44,6 +44,7 @@ export default function TruckInspectionApp() {
   const [driverToDelete, setDriverToDelete] = useState(null);
   const [isCompletingInspection, setIsCompletingInspection] = useState(false);
   const [historySearchTruck, setHistorySearchTruck] = useState('');
+  const [historySearchDriver, setHistorySearchDriver] = useState('');
 
 
   const inspectionItems = [
@@ -1297,6 +1298,7 @@ This is an automated report from the MF King Vehicle Inspection System.
             onClick={() => {
               setShowHistory(false);
               setHistorySearchTruck('');
+              setHistorySearchDriver('');
             }}
             className="text-gray-600 hover:text-gray-800 font-medium"
           >
@@ -1304,24 +1306,49 @@ This is an automated report from the MF King Vehicle Inspection System.
           </button>
         </div>
 
-        {/* Search Filter */}
-        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            🔍 Search by Vehicle Registration Number
-          </label>
-          <input
-            type="text"
-            value={historySearchTruck}
-            onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
-            placeholder="Enter registration number (e.g., ABC123)"
-            className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
-          />
-          {historySearchTruck && (
+        {/* Search Filters */}
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🔍 Search by Vehicle Registration Number
+            </label>
+            <input
+              type="text"
+              value={historySearchTruck}
+              onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
+              placeholder="Enter registration number (e.g., ABC123)"
+              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👤 Filter by Driver Name
+            </label>
+            <input
+              type="text"
+              value={historySearchDriver}
+              onChange={(e) => setHistorySearchDriver(e.target.value)}
+              placeholder="Enter or select driver name"
+              list="driver-suggestions"
+              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            />
+            <datalist id="driver-suggestions">
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.name} />
+              ))}
+            </datalist>
+          </div>
+          
+          {(historySearchTruck || historySearchDriver) && (
             <button
-              onClick={() => setHistorySearchTruck('')}
-              className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-semibold"
+              onClick={() => {
+                setHistorySearchTruck('');
+                setHistorySearchDriver('');
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
             >
-              Clear Search
+              Clear All Filters
             </button>
           )}
         </div>
@@ -1332,8 +1359,16 @@ This is an automated report from the MF King Vehicle Inspection System.
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
             {savedInspections
               .filter(inspection => {
-                if (!historySearchTruck) return true;
-                return inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+                // Filter by registration number
+                const matchesTruck = !historySearchTruck || 
+                  inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+                
+                // Filter by driver name (partial match, case-insensitive)
+                const matchesDriver = !historySearchDriver || 
+                  inspection.driverInfo.name.toLowerCase().includes(historySearchDriver.toLowerCase());
+                
+                // Both filters must match
+                return matchesTruck && matchesDriver;
               })
               .map((inspection) => {
               const failedCount = Object.values(inspection.inspectionData).filter(v => v === 'fail').length;
@@ -1377,12 +1412,19 @@ This is an automated report from the MF King Vehicle Inspection System.
               );
             })}
             {savedInspections.filter(inspection => {
-              if (!historySearchTruck) return true;
-              return inspection.truckNumber.toUpperCase().includes(historySearchTruck);
-            }).length === 0 && historySearchTruck && (
+              const matchesTruck = !historySearchTruck || 
+                inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+              const matchesDriver = !historySearchDriver || 
+                inspection.driverInfo.name.toLowerCase().includes(historySearchDriver.toLowerCase());
+              return matchesTruck && matchesDriver;
+            }).length === 0 && (historySearchTruck || historySearchDriver) && (
               <div className="text-center py-8 text-gray-600">
                 <p className="font-semibold mb-1">No inspections found</p>
-                <p className="text-sm">No inspections match "{historySearchTruck}"</p>
+                <p className="text-sm">
+                  No inspections match your filters
+                  {historySearchTruck && ` (Registration: "${historySearchTruck}")`}
+                  {historySearchDriver && ` (Driver: "${historySearchDriver}")`}
+                </p>
               </div>
             )}
           </div>
