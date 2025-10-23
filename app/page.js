@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2, Truck } from 'lucide-react';
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
@@ -1309,29 +1309,30 @@ This is an automated report from the MF King Vehicle Inspection System.
         {/* Search Filters */}
         <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              🔍 Search by Vehicle Registration Number
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <Truck size={16} className="text-gray-600" />
+              search by vehicle registration number
             </label>
             <input
               type="text"
               value={historySearchTruck}
               onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
-              placeholder="Enter registration number (e.g., ABC123)"
-              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+              placeholder="enter registration number (e.g., ABC123)"
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
             />
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              👤 Filter by Driver Name
+              👤 filter by driver name
             </label>
             <input
               type="text"
               value={historySearchDriver}
               onChange={(e) => setHistorySearchDriver(e.target.value)}
-              placeholder="Enter or select driver name"
+              placeholder="enter or select driver name"
               list="driver-suggestions"
-              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
             />
             <datalist id="driver-suggestions">
               {drivers.map((driver) => (
