@@ -90,6 +90,8 @@ export default function TruckInspectionApp() {
   const [firstPageDriverSearchTerm, setFirstPageDriverSearchTerm] = useState('');
   const [firstPageVehicleDropdownOpen, setFirstPageVehicleDropdownOpen] = useState(false);
   const [firstPageVehicleSearchTerm, setFirstPageVehicleSearchTerm] = useState('');
+  const [historyVehicleDropdownOpen, setHistoryVehicleDropdownOpen] = useState(false);
+  const [historyVehicleSearchTerm, setHistoryVehicleSearchTerm] = useState('');
 
   // Helper functions for custom modals
   const showAlert = (title, message) => {
@@ -1496,13 +1498,69 @@ This is an automated report from the MF King Vehicle Inspection System.
               <Truck size={16} className="text-gray-600" />
               Filter by Vehicle Registration Number
             </label>
-            <input
-              type="text"
-              value={historySearchTruck}
-              onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
-              placeholder="Enter Registration Number (e.g ABC123)"
-              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={historyVehicleDropdownOpen ? historyVehicleSearchTerm : historySearchTruck}
+                onChange={(e) => {
+                  setHistoryVehicleSearchTerm(e.target.value.toUpperCase());
+                  setHistoryVehicleDropdownOpen(true);
+                }}
+                onFocus={() => {
+                  setHistoryVehicleDropdownOpen(true);
+                  setHistoryVehicleSearchTerm('');
+                }}
+                placeholder="Enter Registration Number (e.g ABC123)"
+                className="w-full px-3 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white uppercase"
+              />
+              {historyVehicleDropdownOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => {
+                      setHistoryVehicleDropdownOpen(false);
+                      setHistoryVehicleSearchTerm('');
+                    }}
+                  />
+                  <div className="absolute z-20 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div
+                      onClick={() => {
+                        setHistorySearchTruck('');
+                        setHistoryVehicleDropdownOpen(false);
+                        setHistoryVehicleSearchTerm('');
+                      }}
+                      className="px-3 py-3 hover:bg-gray-100 cursor-pointer text-sm text-gray-500 border-b border-gray-200"
+                    >
+                      All Vehicles
+                    </div>
+                    {vehicles
+                      .filter(vehicle => 
+                        vehicle.rego.includes(historyVehicleSearchTerm)
+                      )
+                      .map((vehicle) => (
+                        <div
+                          key={vehicle.id}
+                          onClick={() => {
+                            setHistorySearchTruck(vehicle.rego);
+                            setHistoryVehicleDropdownOpen(false);
+                            setHistoryVehicleSearchTerm('');
+                          }}
+                          className="px-3 py-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 uppercase"
+                        >
+                          {vehicle.rego}
+                        </div>
+                      ))}
+                    {vehicles.filter(vehicle => 
+                      vehicle.rego.includes(historyVehicleSearchTerm)
+                    ).length === 0 && historyVehicleSearchTerm && (
+                      <div className="px-3 py-3 text-sm text-gray-500 italic">
+                        No vehicles found matching "{historyVehicleSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           
           <div>
