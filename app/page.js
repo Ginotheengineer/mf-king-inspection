@@ -1973,7 +1973,7 @@ This is an automated report from the MF King Vehicle Inspection System.
               >
                 + Add Driver
               </button>
-            ) : (
+            ) : showAddDriver && !editingDriver ? (
               <div className="space-y-3">
                 <input
                   type="text"
@@ -2009,7 +2009,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
