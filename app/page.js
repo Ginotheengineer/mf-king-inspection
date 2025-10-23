@@ -129,24 +129,32 @@ export default function TruckInspectionApp() {
         // Load initial data from Firebase
         const loadedInspections = await loadInspectionsFromFirebase();
         
-        // Auto-delete inspections older than 1 year
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        // Auto-delete inspections older than 1 year (runs once per month, silently)
+        const today = new Date();
+        const currentMonth = `${today.getFullYear()}-${today.getMonth()}`;
+        const lastCleanup = localStorage.getItem('lastInspectionCleanup');
         
-        const oldInspections = loadedInspections.filter(inspection => {
-          const inspectionDate = new Date(inspection.timestamp);
-          return inspectionDate < oneYearAgo;
-        });
-        
-        if (oldInspections.length > 0) {
-          console.log(`🗑️ Auto-deleting ${oldInspections.length} inspections older than 1 year...`);
-          for (const inspection of oldInspections) {
-            await deleteInspectionFromFirebase(inspection.id);
+        if (lastCleanup !== currentMonth) {
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          
+          const oldInspections = loadedInspections.filter(inspection => {
+            const inspectionDate = new Date(inspection.timestamp);
+            return inspectionDate < oneYearAgo;
+          });
+          
+          if (oldInspections.length > 0) {
+            for (const inspection of oldInspections) {
+              await deleteInspectionFromFirebase(inspection.id);
+            }
+            localStorage.setItem('lastInspectionCleanup', currentMonth);
+            // Reload inspections after cleanup
+            const cleanedInspections = await loadInspectionsFromFirebase();
+            setSavedInspections(cleanedInspections);
+          } else {
+            localStorage.setItem('lastInspectionCleanup', currentMonth);
+            setSavedInspections(loadedInspections);
           }
-          console.log('✅ Old inspections deleted');
-          // Reload inspections after cleanup
-          const cleanedInspections = await loadInspectionsFromFirebase();
-          setSavedInspections(cleanedInspections);
         } else {
           setSavedInspections(loadedInspections);
         }
