@@ -166,12 +166,11 @@ export default function TruckInspectionApp() {
         setDrivers(loadedDrivers);
         
         console.log('✅ Firebase initialized successfully!');
-        console.log(`   📋 Loaded ${loadedInspections.length - oldInspections.length} inspections`);
+        console.log(`   📋 Loaded inspections`);
         console.log(`   👤 Loaded ${loadedDrivers.length} drivers`);
         console.log(`   🔧 Loaded ${loadedWorkshops.length} workshops`);
       } catch (error) {
         console.error('❌ Error initializing Firebase:', error);
-        showAlert('Connection Error', 'Failed to connect to database. Please check your internet connection and Firebase configuration.');
       }
     };
     
