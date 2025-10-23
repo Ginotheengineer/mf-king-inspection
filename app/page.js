@@ -10,6 +10,7 @@ import {
   saveDriverToFirebase,
   loadDriversFromFirebase,
   deleteDriverFromFirebase,
+  updateDriverInFirebase,
   subscribeToDrivers,
   saveWorkshopToFirebase,
   updateWorkshopInFirebase,
@@ -63,6 +64,7 @@ export default function TruckInspectionApp() {
   const [showManageDrivers, setShowManageDrivers] = useState(false);
   const [newDriverName, setNewDriverName] = useState('');
   const [driverToDelete, setDriverToDelete] = useState(null);
+  const [editingDriver, setEditingDriver] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showManageVehicles, setShowManageVehicles] = useState(false);
@@ -292,6 +294,7 @@ export default function TruckInspectionApp() {
 
     try {
       await deleteDriverFromFirebase(driverId);
+      setEditingDriver(null);
       console.log('✅ Driver deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting driver:', error);
@@ -1894,22 +1897,76 @@ This is an automated report from the MF King Vehicle Inspection System.
 
             <div className="space-y-3 mb-4">
               {drivers.map((driver) => (
-                <div key={driver.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                  <span className="font-semibold text-gray-800">{driver.name}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDriverToDelete(driver);
-                    }}
-                    className="text-red-600 hover:text-red-800 font-semibold text-sm px-3 py-1 bg-red-100 rounded hover:bg-red-200"
-                  >
-                    Delete
-                  </button>
+                <div key={driver.id}>
+                  {editingDriver?.id === driver.id ? (
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 space-y-3">
+                      <h3 className="font-bold text-gray-800">Edit Driver</h3>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
+                        <input
+                          type="text"
+                          value={editingDriver.name}
+                          onChange={(e) => setEditingDriver(prev => ({ ...prev, name: e.target.value }))}
+                          className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            if (editingDriver.name.trim()) {
+                              try {
+                                await updateDriverInFirebase(editingDriver.id, { name: editingDriver.name });
+                                setEditingDriver(null);
+                                console.log('✅ Driver updated successfully');
+                              } catch (error) {
+                                console.error('❌ Error updating driver:', error);
+                                showAlert('Error', 'Failed to update driver. Please try again.');
+                              }
+                            } else {
+                              showAlert('Missing Information', 'Please enter a driver name');
+                            }
+                          }}
+                          className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => setDriverToDelete(editingDriver)}
+                          className="flex-1 bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 active:bg-red-800"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setEditingDriver(null)}
+                          className="px-4 bg-gray-600 text-white py-2 rounded-lg font-semibold hover:bg-gray-700 active:bg-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <span className="font-semibold text-gray-800">{driver.name}</span>
+                        {!editingDriver && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingDriver({ id: driver.id, name: driver.name });
+                            }}
+                            className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
-            {!showAddDriver ? (
+            {!showAddDriver && !editingDriver ? (
               <button
                 onClick={() => setShowAddDriver(true)}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"

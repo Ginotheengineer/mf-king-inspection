@@ -158,6 +158,24 @@ export const deleteDriverFromFirebase = async (driverId) => {
 };
 
 /**
+ * Update a driver in Firebase
+ * @param {string} driverId - The ID of the driver to update
+ * @param {Object} driverData - Object with name
+ */
+export const updateDriverInFirebase = async (driverId, driverData) => {
+  try {
+    await updateDoc(doc(db, 'drivers', driverId), {
+      name: driverData.name,
+      updatedAt: new Date().toISOString()
+    });
+    console.log('Driver updated:', driverId);
+  } catch (error) {
+    console.error('Error updating driver:', error);
+    throw error;
+  }
+};
+
+/**
  * Listen to real-time driver updates
  * @param {Function} callback - Function to call when drivers change
  * @returns {Function} Unsubscribe function
