@@ -18,7 +18,7 @@ import {
   subscribeToWorkshops,
   initializeDefaultWorkshop,
   initializeDefaultDrivers
-} from './firebaseHelpers';
+} from '../firebaseHelpers';
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
