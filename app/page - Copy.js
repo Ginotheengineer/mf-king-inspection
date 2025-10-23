@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2, Truck, User } from 'lucide-react';
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
@@ -42,6 +42,9 @@ export default function TruckInspectionApp() {
   const [showManageDrivers, setShowManageDrivers] = useState(false);
   const [newDriverName, setNewDriverName] = useState('');
   const [driverToDelete, setDriverToDelete] = useState(null);
+  const [isCompletingInspection, setIsCompletingInspection] = useState(false);
+  const [historySearchTruck, setHistorySearchTruck] = useState('');
+  const [historySearchDriver, setHistorySearchDriver] = useState('');
 
 
   const inspectionItems = [
@@ -185,7 +188,6 @@ export default function TruckInspectionApp() {
 
     request.onsuccess = () => {
       loadDrivers(db);
-      alert('✅ Driver added successfully!');
     };
 
     request.onerror = () => {
@@ -214,7 +216,6 @@ export default function TruckInspectionApp() {
       request.onsuccess = () => {
         console.log('Driver deleted successfully');
         loadDrivers(db);
-        alert('✅ Driver deleted successfully!');
       };
 
       request.onerror = (error) => {
@@ -527,16 +528,39 @@ This is an automated report from the MF King Vehicle Inspection System.
       const photoGalleryHTML = failedItemsWithPhotos
         .map(item => {
           if (item.photoUrls.length === 0) return '';
+          
+          // Create table rows with 2 images per row for better Outlook compatibility
+          let photoRows = '';
+          for (let i = 0; i < item.photoUrls.length; i += 2) {
+            const img1 = item.photoUrls[i];
+            const img2 = item.photoUrls[i + 1];
+            
+            photoRows += `
+              <tr>
+                <td style="padding: 5px; width: 50%;">
+                  <img src="${img1}" alt="${item.category} damage" style="width: 100%; max-width: 300px; height: auto; border-radius: 5px; border: 2px solid #dc2626; display: block;" />
+                </td>
+                ${img2 ? `
+                <td style="padding: 5px; width: 50%;">
+                  <img src="${img2}" alt="${item.category} damage" style="width: 100%; max-width: 300px; height: auto; border-radius: 5px; border: 2px solid #dc2626; display: block;" />
+                </td>` : '<td style="padding: 5px; width: 50%;"></td>'}
+              </tr>`;
+          }
+          
           return `
-          <div style="margin-bottom: 20px; padding: 15px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-            <h4 style="color: #374151; margin: 0 0 10px 0;">${item.category}</h4>
-            <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
-              ${item.photoUrls.map(url => 
-                `<img src="${url}" alt="${item.category} damage" style="width: 100%; max-width: 400px; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />`
-              ).join('')}
-            </div>
-          </div>`;
+          <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-bottom: 20px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <tr>
+              <td style="padding: 15px;">
+                <h4 style="color: #374151; margin: 0 0 10px 0; font-size: 16px; font-weight: bold;">${item.category}</h4>
+                <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
+                ${item.critical ? '<p style="color: #dc2626; font-size: 12px; font-weight: bold; margin: 0 0 10px 0;">⚠️ CRITICAL SAFETY ITEM</p>' : ''}
+                ${notes[item.id] ? `<p style="color: #374151; font-size: 13px; margin: 0 0 10px 0;"><strong>Notes:</strong> ${notes[item.id]}</p>` : ''}
+                <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                  ${photoRows}
+                </table>
+              </td>
+            </tr>
+          </table>`;
         }).join('');
 
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -630,24 +654,31 @@ This is an automated report from the MF King Vehicle Inspection System.
       }
     };
 
-    // If no damages, save immediately to history
+    // If no damages, save immediately to history with loading state
     if (!hasDamages()) {
-      saveInspection(inspectionRecord);
+      setIsCompletingInspection(true);
+      // Simulate a brief delay for better UX
+      setTimeout(() => {
+        saveInspection(inspectionRecord);
+        setIsCompletingInspection(false);
+        setShowSummary(true);
+      }, 800);
+    } else {
+      // If damages, will save when Send Report is clicked
+      setShowSummary(true);
     }
-    // If damages, will save when Send Report is clicked
-    setShowSummary(true);
   };
 
   const renderDriverInfo = () => (
-    <div className="space-y-5">
-      <h2 className="text-2xl font-bold text-gray-800">Driver Information</h2>
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <h2 className="text-lg sm:text-xl font-bold text-gray-800">Driver Information</h2>
+      <div className="space-y-3">
         <div>
           <div className="flex justify-between items-center mb-2">
-            <label className="block text-base font-medium text-gray-700">Driver Name</label>
+            <label className="block text-sm sm:text-base font-medium text-gray-700">Driver Name</label>
             <button
               onClick={() => setShowManageDrivers(true)}
-              className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+              className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-semibold"
             >
               Manage Drivers
             </button>
@@ -655,7 +686,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           <select
             value={driverInfo.name}
             onChange={(e) => setDriverInfo(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+            className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
           >
             <option value="">Select driver</option>
             {drivers.map((driver) => (
@@ -664,12 +695,12 @@ This is an automated report from the MF King Vehicle Inspection System.
           </select>
         </div>
         <div>
-          <label className="block text-base font-medium text-gray-700 mb-2">Vehicle Registration Number</label>
+          <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">Vehicle Registration Number</label>
           <input
             type="text"
             value={driverInfo.truckNumber}
             onChange={(e) => setDriverInfo(prev => ({ ...prev, truckNumber: e.target.value.toUpperCase() }))}
-            className="w-full px-4 py-4 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 uppercase"
+            className="w-full px-3 py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 uppercase"
             placeholder="e.g., ABC123"
           />
         </div>
@@ -677,17 +708,17 @@ This is an automated report from the MF King Vehicle Inspection System.
       <button
         onClick={() => setCurrentStep('inspection')}
         disabled={!driverInfo.name || !driverInfo.truckNumber}
-        className="w-full mt-6 bg-red-600 text-white py-4 text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="w-full mt-4 bg-red-600 text-white py-3 text-base sm:text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        Start Inspection <ChevronRight size={24} />
+        Start Inspection <ChevronRight size={20} className="sm:hidden" /><ChevronRight size={24} className="hidden sm:block" />
       </button>
       
       {savedInspections.length > 0 && (
         <button
           onClick={() => setShowHistory(true)}
-          className="w-full mt-3 bg-gray-600 text-white py-4 text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-700 active:bg-gray-800 transition-colors"
+          className="w-full mt-3 bg-gray-600 text-white py-3 text-base sm:text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-700 active:bg-gray-800 transition-colors"
         >
-          <History size={22} /> View History ({savedInspections.length})
+          <History size={20} className="sm:hidden" /><History size={22} className="hidden sm:block" /> Inspection History ({savedInspections.length})
         </button>
       )}
     </div>
@@ -702,7 +733,7 @@ This is an automated report from the MF King Vehicle Inspection System.
         >
           ← Back
         </button>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Vehicle Inspection</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800">Vehicle Inspection</h2>
         <span className="text-base sm:text-lg font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
           {Object.keys(inspectionData).length}/{inspectionItems.length}
         </span>
@@ -710,10 +741,10 @@ This is an automated report from the MF King Vehicle Inspection System.
       
       <div className="space-y-4">
         {inspectionItems.map((item) => (
-          <div key={item.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 shadow-sm">
-            <div className="flex items-start justify-between mb-4">
+          <div key={item.id} className="bg-white border-2 border-gray-200 rounded-xl p-3 sm:p-4 shadow-sm">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 mb-2">
+                <h3 className="font-bold text-base sm:text-lg text-gray-800 flex items-center gap-2 mb-2">
                   {item.category}
                   {item.critical && (
                     <button
@@ -734,54 +765,54 @@ This is an automated report from the MF King Vehicle Inspection System.
                       className="relative inline-block"
                     >
                       <AlertTriangle size={20} className="text-red-600" />
-                      <span className="tooltip-text absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
+                      <span className="tooltip-text absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
                         Critical safety item - must be functional
-                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
+                        <span className="absolute top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
                       </span>
                     </button>
                   )}
                 </h3>
-                <p className="text-base text-gray-600 leading-relaxed">{item.question}</p>
+                <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{item.question}</p>
               </div>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={() => handleInspectionAnswer(item.id, 'pass')}
-                className={`flex-1 py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-base transition-all ${
+                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-colors duration-100 touch-manipulation ${
                   inspectionData[item.id] === 'pass'
-                    ? 'bg-green-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 active:bg-gray-300'
                 }`}
               >
-                <CheckCircle2 size={24} /> Pass
+                <CheckCircle2 size={20} className="sm:hidden" /><CheckCircle2 size={24} className="hidden sm:block" /> Pass
               </button>
               <button
                 onClick={() => handleInspectionAnswer(item.id, 'fail')}
-                className={`flex-1 py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-base transition-all ${
+                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold text-sm sm:text-base transition-colors duration-100 touch-manipulation ${
                   inspectionData[item.id] === 'fail'
-                    ? 'bg-red-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+                    ? 'bg-red-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 active:bg-gray-300'
                 }`}
               >
-                <XCircle size={24} /> Fail
+                <XCircle size={20} className="sm:hidden" /><XCircle size={24} className="hidden sm:block" /> Fail
               </button>
             </div>
 
             {inspectionData[item.id] === 'fail' && (
-              <div className="mt-4 border-t-2 pt-4 bg-red-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
-                <label className="block text-base font-bold text-gray-700 mb-2">
+              <div className="mt-3 border-t-2 pt-3 bg-red-50 -mx-3 sm:-mx-4 -mb-3 sm:-mb-4 px-3 sm:px-4 pb-3 sm:pb-4 rounded-b-xl">
+                <label className="block text-sm sm:text-base font-bold text-gray-700 mb-2">
                   Describe the problem
                 </label>
                 <textarea
                   value={notes[item.id] || ''}
                   onChange={(e) => handleNoteChange(item.id, e.target.value)}
                   placeholder="Enter details about the damage or issue..."
-                  className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 min-h-[100px] mb-4"
+                  className="w-full px-3 py-2 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 min-h-[80px] sm:min-h-[100px] mb-3"
                 />
                 
-                <label className="block text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
-                  <Camera size={20} /> Add Photos of Damage
+                <label className="block text-sm sm:text-base font-bold text-gray-700 mb-2 flex items-center gap-2">
+                  <Camera size={18} className="sm:hidden" /><Camera size={20} className="hidden sm:block" /> Add Photos of Damage
                 </label>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <label className="bg-red-600 text-white py-2 px-2 rounded-lg font-bold text-center flex items-center justify-center gap-1 hover:bg-red-700 active:bg-red-800 cursor-pointer text-xs sm:text-sm whitespace-nowrap">
@@ -830,25 +861,38 @@ This is an automated report from the MF King Vehicle Inspection System.
 
       <button
         onClick={() => hasDamages() ? setCurrentStep('workshop') : completeInspection()}
-        disabled={Object.keys(inspectionData).length !== inspectionItems.length}
-        className="w-full mt-6 bg-red-600 text-white py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-lg"
+        disabled={Object.keys(inspectionData).length !== inspectionItems.length || isCompletingInspection}
+        className={`w-full mt-6 py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg ${
+          isCompletingInspection
+            ? 'bg-orange-500 text-white cursor-wait'
+            : 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed'
+        }`}
       >
-        {hasDamages() ? 'Select Workshop' : 'Complete Inspection'} <ChevronRight size={24} />
+        {isCompletingInspection ? (
+          <>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+            Completing Inspection...
+          </>
+        ) : (
+          <>
+            {hasDamages() ? 'Select Workshop' : 'Complete Inspection'} <ChevronRight size={24} />
+          </>
+        )}
       </button>
     </div>
   );
 
   const renderWorkshopSelection = () => (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => setCurrentStep('inspection')}
-          className="text-blue-600 hover:text-blue-800 font-semibold"
+          className="text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base whitespace-nowrap"
         >
           ← Back
         </button>
-        <h2 className="text-2xl font-bold text-gray-800">Select Workshop(s)</h2>
-        <div className="w-16"></div>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800 text-center">Select Workshop(s)</h2>
+        <div className="w-12 sm:w-16"></div>
       </div>
       <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
         <p className="text-red-700 font-bold text-base">⚠️ Damages detected - Select one or more workshops</p>
@@ -1015,22 +1059,22 @@ This is an automated report from the MF King Vehicle Inspection System.
 
     return (
       <div className="space-y-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {hasDamages() ? (
             <button
               onClick={() => {
                 setShowSummary(false);
                 setCurrentStep('workshop');
               }}
-              className="text-blue-600 hover:text-blue-800 font-semibold"
+              className="text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base whitespace-nowrap"
             >
               ← Back
             </button>
           ) : (
-            <div className="w-16"></div>
+            <div className="w-12 sm:w-16"></div>
           )}
-          <h2 className="text-2xl font-bold text-gray-800">Inspection Summary</h2>
-          <div className="w-16"></div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 text-center">Inspection Summary</h2>
+          <div className="w-12 sm:w-16"></div>
         </div>
         
         {hasDamages() ? (
@@ -1161,7 +1205,7 @@ This is an automated report from the MF King Vehicle Inspection System.
       return (
         <div className="space-y-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">Inspection Report</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">Inspection Report</h2>
             <button
               onClick={() => setViewingInspection(null)}
               className="text-red-600 hover:text-red-800 font-bold"
@@ -1249,20 +1293,86 @@ This is an automated report from the MF King Vehicle Inspection System.
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">Inspection History</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">Inspection History</h2>
           <button
-            onClick={() => setShowHistory(false)}
+            onClick={() => {
+              setShowHistory(false);
+              setHistorySearchTruck('');
+              setHistorySearchDriver('');
+            }}
             className="text-gray-600 hover:text-gray-800 font-medium"
           >
             Close
           </button>
         </div>
 
+        {/* Search Filters */}
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <Truck size={16} className="text-gray-600" />
+              Filter by Vehicle Registration Number
+            </label>
+            <input
+              type="text"
+              value={historySearchTruck}
+              onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
+              placeholder="enter registration number (e.g., ABC123)"
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <User size={16} className="text-gray-600" />
+              Filter by Driver Name
+            </label>
+            <input
+              type="text"
+              value={historySearchDriver}
+              onChange={(e) => setHistorySearchDriver(e.target.value)}
+              placeholder="enter or select driver name"
+              list="driver-suggestions"
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            />
+            <datalist id="driver-suggestions">
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.name} />
+              ))}
+            </datalist>
+          </div>
+          
+          {(historySearchTruck || historySearchDriver) && (
+            <button
+              onClick={() => {
+                setHistorySearchTruck('');
+                setHistorySearchDriver('');
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
+
         {savedInspections.length === 0 ? (
           <p className="text-gray-600 text-center py-8">No inspections saved yet.</p>
         ) : (
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {savedInspections.map((inspection) => {
+            {savedInspections
+              .filter(inspection => {
+                // Filter by registration number
+                const matchesTruck = !historySearchTruck || 
+                  inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+                
+                // Filter by driver name (partial match, case-insensitive)
+                const matchesDriver = !historySearchDriver || 
+                  inspection.driverInfo.name.toLowerCase().includes(historySearchDriver.toLowerCase());
+                
+                // Both filters must match
+                return matchesTruck && matchesDriver;
+              })
+              .map((inspection) => {
               const failedCount = Object.values(inspection.inspectionData).filter(v => v === 'fail').length;
               
               return (
@@ -1303,6 +1413,22 @@ This is an automated report from the MF King Vehicle Inspection System.
                 </div>
               );
             })}
+            {savedInspections.filter(inspection => {
+              const matchesTruck = !historySearchTruck || 
+                inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+              const matchesDriver = !historySearchDriver || 
+                inspection.driverInfo.name.toLowerCase().includes(historySearchDriver.toLowerCase());
+              return matchesTruck && matchesDriver;
+            }).length === 0 && (historySearchTruck || historySearchDriver) && (
+              <div className="text-center py-8 text-gray-600">
+                <p className="font-semibold mb-1">No inspections found</p>
+                <p className="text-sm">
+                  No inspections match your filters
+                  {historySearchTruck && ` (Registration: "${historySearchTruck}")`}
+                  {historySearchDriver && ` (Driver: "${historySearchDriver}")`}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1310,21 +1436,21 @@ This is an automated report from the MF King Vehicle Inspection System.
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-6">
-      <div className="max-w-3xl mx-auto px-3 sm:px-4">
-        <div className="bg-white shadow-lg mb-4">
-          <div className="flex flex-col items-center py-4 px-3">
-            <div className="mb-3">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-4">
+      <div className="max-w-3xl mx-auto px-2 sm:px-4">
+        <div className="bg-white shadow-lg mb-3">
+          <div className="flex flex-col items-center py-3 px-2">
+            <div className="mb-2">
               {!logoError ? (
                 <img 
                   src="/mf-king-logo.jpg" 
                   alt="MF King Engineering Ltd" 
-                  className="h-20 w-auto object-contain"
+                  className="h-16 sm:h-20 w-auto object-contain"
                   onError={() => setLogoError(true)}
                 />
               ) : (
                 <div className="text-center">
-                  <div className="font-bold text-3xl sm:text-4xl mb-1">
+                  <div className="font-bold text-2xl sm:text-3xl md:text-4xl mb-1">
                     <span className="text-red-600">MF</span>
                     <span className="text-gray-900">-KING</span>
                   </div>
@@ -1335,16 +1461,16 @@ This is an automated report from the MF King Vehicle Inspection System.
                 </div>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-center text-gray-800">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-center text-gray-800">
               Vehicle Pre-Start Inspection
             </h1>
-            <p className="text-sm sm:text-base text-gray-600 text-center mt-2 px-4">
+            <p className="text-xs sm:text-sm text-gray-600 text-center mt-1 px-2">
               Use this checklist to make a quick visual assessment of vehicle condition and generate a report of any issues
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+        <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
           {showHistory ? renderHistory() : (
             <>
               {!showSummary && currentStep === 'driver-info' && renderDriverInfo()}

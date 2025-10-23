@@ -2,6 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2, Truck, User } from 'lucide-react';
+import {
+  saveInspectionToFirebase,
+  loadInspectionsFromFirebase,
+  deleteInspectionFromFirebase,
+  subscribeToInspections,
+  saveDriverToFirebase,
+  loadDriversFromFirebase,
+  deleteDriverFromFirebase,
+  subscribeToDrivers,
+  saveWorkshopToFirebase,
+  updateWorkshopInFirebase,
+  loadWorkshopsFromFirebase,
+  deleteWorkshopFromFirebase,
+  subscribeToWorkshops,
+  initializeDefaultWorkshop,
+  initializeDefaultDrivers
+} from './firebaseHelpers';
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
@@ -32,7 +49,6 @@ export default function TruckInspectionApp() {
   const [editingWorkshop, setEditingWorkshop] = useState(null);
   const [workshopToDelete, setWorkshopToDelete] = useState(null);
   const [newWorkshop, setNewWorkshop] = useState({ name: '', email: '' });
-  const [db, setDb] = useState(null);
   const [logoError, setLogoError] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -61,51 +77,60 @@ export default function TruckInspectionApp() {
   ];
 
   useEffect(() => {
-    const initDB = () => {
-      const request = indexedDB.open('TruckInspectionDB', 3);
-
-      request.onerror = () => {
-        console.error('Database failed to open');
-      };
-
-      request.onsuccess = () => {
-        const database = request.result;
-        setDb(database);
-        loadInspections(database);
-        loadWorkshops(database);
-        loadDrivers(database);
-      };
-
-      request.onupgradeneeded = (e) => {
-        const database = e.target.result;
+    // Initialize Firebase data on component mount
+    const initializeFirebase = async () => {
+      try {
+        console.log('🔥 Initializing Firebase...');
         
-        if (!database.objectStoreNames.contains('inspections')) {
-          const objectStore = database.createObjectStore('inspections', { keyPath: 'id', autoIncrement: true });
-          objectStore.createIndex('date', 'date', { unique: false });
-          objectStore.createIndex('truckNumber', 'truckNumber', { unique: false });
-        }
+        // Initialize default data if collections are empty
+        await initializeDefaultWorkshop();
+        await initializeDefaultDrivers();
         
-        if (!database.objectStoreNames.contains('workshops')) {
-          const workshopStore = database.createObjectStore('workshops', { keyPath: 'id', autoIncrement: true });
-          workshopStore.createIndex('name', 'name', { unique: false });
-          
-          // Add default workshop
-          const defaultWorkshop = { name: 'MF King Engineering Ltd', email: 'gino@mfking.co.nz' };
-          workshopStore.add(defaultWorkshop);
-        }
+        // Load initial data from Firebase
+        const loadedInspections = await loadInspectionsFromFirebase();
+        setSavedInspections(loadedInspections);
         
-        if (!database.objectStoreNames.contains('drivers')) {
-          const driverStore = database.createObjectStore('drivers', { keyPath: 'id', autoIncrement: true });
-          driverStore.createIndex('name', 'name', { unique: false });
-          
-          // Add default drivers
-          driverStore.add({ name: 'Gino Esposito' });
-          driverStore.add({ name: 'Harry Wheelans' });
-        }
-      };
+        const loadedWorkshops = await loadWorkshopsFromFirebase();
+        setWorkshops(loadedWorkshops);
+        
+        const loadedDrivers = await loadDriversFromFirebase();
+        setDrivers(loadedDrivers);
+        
+        console.log('✅ Firebase initialized successfully!');
+        console.log(`   📋 Loaded ${loadedInspections.length} inspections`);
+        console.log(`   👤 Loaded ${loadedDrivers.length} drivers`);
+        console.log(`   🔧 Loaded ${loadedWorkshops.length} workshops`);
+      } catch (error) {
+        console.error('❌ Error initializing Firebase:', error);
+        alert('Failed to connect to database. Please check your internet connection and Firebase configuration.');
+      }
     };
-
-    initDB();
+    
+    initializeFirebase();
+    
+    // Set up real-time listeners for automatic data synchronization
+    const unsubscribeInspections = subscribeToInspections((inspections) => {
+      console.log('🔄 Real-time update: Inspections changed');
+      setSavedInspections(inspections);
+    });
+    
+    const unsubscribeDrivers = subscribeToDrivers((drivers) => {
+      console.log('🔄 Real-time update: Drivers changed');
+      setDrivers(drivers);
+    });
+    
+    const unsubscribeWorkshops = subscribeToWorkshops((workshops) => {
+      console.log('🔄 Real-time update: Workshops changed');
+      setWorkshops(workshops);
+    });
+    
+    // Cleanup function - unsubscribe from listeners when component unmounts
+    return () => {
+      console.log('🧹 Cleaning up Firebase listeners');
+      unsubscribeInspections();
+      unsubscribeDrivers();
+      unsubscribeWorkshops();
+    };
   }, []);
 
   // Auto-redirect after 5 seconds when inspection is complete
@@ -149,59 +174,18 @@ export default function TruckInspectionApp() {
     }
   }, [showSummary, emailSent]);
 
-  const loadInspections = (database) => {
-    const transaction = database.transaction(['inspections'], 'readonly');
-    const objectStore = transaction.objectStore('inspections');
-    const request = objectStore.getAll();
-
-    request.onsuccess = () => {
-      setSavedInspections(request.result.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
-    };
-  };
-
-  const loadWorkshops = (database) => {
-    const transaction = database.transaction(['workshops'], 'readonly');
-    const objectStore = transaction.objectStore('workshops');
-    const request = objectStore.getAll();
-
-    request.onsuccess = () => {
-      setWorkshops(request.result);
-    };
-  };
-
-  const loadDrivers = (database) => {
-    const transaction = database.transaction(['drivers'], 'readonly');
-    const objectStore = transaction.objectStore('drivers');
-    const request = objectStore.getAll();
-
-    request.onsuccess = () => {
-      setDrivers(request.result);
-    };
-  };
-
-  const saveDriver = (driverName) => {
-    if (!db) return;
-
-    const transaction = db.transaction(['drivers'], 'readwrite');
-    const objectStore = transaction.objectStore('drivers');
-    const request = objectStore.add({ name: driverName });
-
-    request.onsuccess = () => {
-      loadDrivers(db);
-    };
-
-    request.onerror = () => {
+  const saveDriver = async (driverName) => {
+    try {
+      await saveDriverToFirebase(driverName);
+      console.log('✅ Driver saved successfully:', driverName);
+    } catch (error) {
+      console.error('❌ Error saving driver:', error);
       alert('❌ Failed to add driver. Please try again.');
-    };
+    }
   };
 
-  const deleteDriver = (driverId) => {
+  const deleteDriver = async (driverId) => {
     console.log('Attempting to delete driver:', driverId);
-    
-    if (!db) {
-      alert('❌ Database not ready. Please try again.');
-      return;
-    }
     
     if (drivers.length === 1) {
       alert('❌ Cannot delete the last driver. At least one driver must remain.');
@@ -209,103 +193,54 @@ export default function TruckInspectionApp() {
     }
 
     try {
-      const transaction = db.transaction(['drivers'], 'readwrite');
-      const objectStore = transaction.objectStore('drivers');
-      const request = objectStore.delete(driverId);
-
-      request.onsuccess = () => {
-        console.log('Driver deleted successfully');
-        loadDrivers(db);
-      };
-
-      request.onerror = (error) => {
-        console.error('Delete failed:', error);
-        alert('❌ Failed to delete driver. Please try again.');
-      };
+      await deleteDriverFromFirebase(driverId);
+      console.log('✅ Driver deleted successfully');
     } catch (error) {
-      console.error('Delete error:', error);
+      console.error('❌ Error deleting driver:', error);
       alert('❌ Failed to delete driver. Please try again.');
     }
   };
 
-  const saveWorkshop = (workshop) => {
-    if (!db) return;
-
-    const transaction = db.transaction(['workshops'], 'readwrite');
-    const objectStore = transaction.objectStore('workshops');
-    const request = objectStore.add(workshop);
-
-    request.onsuccess = () => {
-      loadWorkshops(db);
-      setShowAddWorkshop(false);
-      setNewWorkshop({ name: '', email: '' });
-      alert('✅ Workshop added successfully!');
-    };
-
-    request.onerror = () => {
-      alert('❌ Failed to add workshop. Please try again.');
-    };
-  };
-
-  const deleteWorkshop = (workshopToDelete) => {
-    if (!db) {
-      alert('❌ Database not ready. Please try again.');
+  const saveWorkshop = async () => {
+    if (!newWorkshop.name || !newWorkshop.email) {
+      alert('Please enter both name and email');
       return;
     }
     
+    try {
+      if (editingWorkshop) {
+        await updateWorkshopInFirebase(editingWorkshop.id, newWorkshop);
+        setEditingWorkshop(null);
+        console.log('✅ Workshop updated successfully');
+      } else {
+        await saveWorkshopToFirebase(newWorkshop);
+        console.log('✅ Workshop added successfully');
+      }
+      
+      setNewWorkshop({ name: '', email: '' });
+      setShowAddWorkshop(false);
+    } catch (error) {
+      console.error('❌ Error saving workshop:', error);
+      alert('❌ Failed to save workshop. Please try again.');
+    }
+  };
+
+  const deleteWorkshop = async (workshopId) => {
     if (workshops.length === 1) {
       alert('❌ Cannot delete the last workshop. At least one workshop must remain.');
-      setEditingWorkshop(null);
       return;
     }
-
+    
     try {
-      const transaction = db.transaction(['workshops'], 'readwrite');
-      const objectStore = transaction.objectStore('workshops');
-      const request = objectStore.delete(workshopToDelete.id);
-
-      request.onsuccess = () => {
-        console.log('Workshop deleted successfully:', workshopToDelete.id);
-        // Remove from selected workshops if it was selected
-        setSelectedWorkshops(prev => prev.filter(id => id !== workshopToDelete.id));
-        setEditingWorkshop(null);
-        setWorkshopToDelete(null);
-        // Reload workshops from database
-        loadWorkshops(db);
-        alert('✅ Workshop deleted successfully!');
-      };
-
-      request.onerror = (error) => {
-        console.error('Delete failed:', error);
-        alert('❌ Failed to delete workshop. Please try again.');
-      };
+      await deleteWorkshopFromFirebase(workshopId);
+      // Remove from selected workshops if it was selected
+      setSelectedWorkshops(prev => prev.filter(id => id !== workshopId));
+      setWorkshopToDelete(null);
+      console.log('✅ Workshop deleted successfully');
     } catch (error) {
-      console.error('Delete error:', error);
+      console.error('❌ Error deleting workshop:', error);
       alert('❌ Failed to delete workshop. Please try again.');
     }
-  };
-
-  const updateWorkshop = (id, updatedData) => {
-    if (!db) return;
-
-    const transaction = db.transaction(['workshops'], 'readwrite');
-    const objectStore = transaction.objectStore('workshops');
-    
-    const getRequest = objectStore.get(id);
-    
-    getRequest.onsuccess = () => {
-      const workshop = getRequest.result;
-      workshop.name = updatedData.name;
-      workshop.email = updatedData.email;
-      
-      const updateRequest = objectStore.put(workshop);
-      
-      updateRequest.onsuccess = () => {
-        loadWorkshops(db);
-        setEditingWorkshop(null);
-        alert('✅ Workshop updated successfully!');
-      };
-    };
   };
 
   const toggleWorkshopSelection = (workshopId) => {
@@ -318,28 +253,26 @@ export default function TruckInspectionApp() {
     });
   };
 
-  const saveInspection = (inspectionRecord) => {
-    if (!db) return;
-
-    const transaction = db.transaction(['inspections'], 'readwrite');
-    const objectStore = transaction.objectStore('inspections');
-    const request = objectStore.add(inspectionRecord);
-
-    request.onsuccess = () => {
-      loadInspections(db);
-    };
+  const saveInspection = async (inspectionRecord) => {
+    try {
+      await saveInspectionToFirebase(inspectionRecord);
+      console.log('✅ Inspection saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving inspection:', error);
+      alert('Failed to save inspection. Please try again.');
+    }
   };
 
-  const deleteInspection = (id) => {
-    if (!db) return;
-
-    const transaction = db.transaction(['inspections'], 'readwrite');
-    const objectStore = transaction.objectStore('inspections');
-    const request = objectStore.delete(id);
-
-    request.onsuccess = () => {
-      loadInspections(db);
-    };
+  const deleteInspection = async (id) => {
+    if (window.confirm('Are you sure you want to delete this inspection?')) {
+      try {
+        await deleteInspectionFromFirebase(id);
+        console.log('✅ Inspection deleted successfully');
+      } catch (error) {
+        console.error('❌ Error deleting inspection:', error);
+        alert('Failed to delete inspection. Please try again.');
+      }
+    }
   };
 
   const handleInspectionAnswer = (itemId, value) => {
