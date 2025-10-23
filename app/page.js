@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2, Truck } from 'lucide-react';
+import { Camera, CheckCircle2, XCircle, Send, ChevronRight, AlertTriangle, History, Trash2, Truck, User } from 'lucide-react';
 
 export default function TruckInspectionApp() {
   const [currentStep, setCurrentStep] = useState('driver-info');
@@ -1311,7 +1311,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
               <Truck size={16} className="text-gray-600" />
-              search by vehicle registration number
+              Filter by Vehicle Registration Number
             </label>
             <input
               type="text"
@@ -1323,8 +1323,9 @@ This is an automated report from the MF King Vehicle Inspection System.
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              👤 filter by driver name
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <User size={16} className="text-gray-600" />
+              Filter by Driver Name
             </label>
             <input
               type="text"
