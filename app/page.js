@@ -43,6 +43,7 @@ export default function TruckInspectionApp() {
   const [newDriverName, setNewDriverName] = useState('');
   const [driverToDelete, setDriverToDelete] = useState(null);
   const [isCompletingInspection, setIsCompletingInspection] = useState(false);
+  const [historySearchTruck, setHistorySearchTruck] = useState('');
 
 
   const inspectionItems = [
@@ -526,16 +527,39 @@ This is an automated report from the MF King Vehicle Inspection System.
       const photoGalleryHTML = failedItemsWithPhotos
         .map(item => {
           if (item.photoUrls.length === 0) return '';
+          
+          // Create table rows with 2 images per row for better Outlook compatibility
+          let photoRows = '';
+          for (let i = 0; i < item.photoUrls.length; i += 2) {
+            const img1 = item.photoUrls[i];
+            const img2 = item.photoUrls[i + 1];
+            
+            photoRows += `
+              <tr>
+                <td style="padding: 5px; width: 50%;">
+                  <img src="${img1}" alt="${item.category} damage" style="width: 100%; max-width: 300px; height: auto; border-radius: 5px; border: 2px solid #dc2626; display: block;" />
+                </td>
+                ${img2 ? `
+                <td style="padding: 5px; width: 50%;">
+                  <img src="${img2}" alt="${item.category} damage" style="width: 100%; max-width: 300px; height: auto; border-radius: 5px; border: 2px solid #dc2626; display: block;" />
+                </td>` : '<td style="padding: 5px; width: 50%;"></td>'}
+              </tr>`;
+          }
+          
           return `
-          <div style="margin-bottom: 20px; padding: 15px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
-            <h4 style="color: #374151; margin: 0 0 10px 0;">${item.category}</h4>
-            <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
-              ${item.photoUrls.map(url => 
-                `<img src="${url}" alt="${item.category} damage" style="width: 100%; max-width: 400px; height: auto; border-radius: 5px; border: 2px solid #dc2626;" />`
-              ).join('')}
-            </div>
-          </div>`;
+          <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-bottom: 20px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <tr>
+              <td style="padding: 15px;">
+                <h4 style="color: #374151; margin: 0 0 10px 0; font-size: 16px; font-weight: bold;">${item.category}</h4>
+                <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">${item.question}</p>
+                ${item.critical ? '<p style="color: #dc2626; font-size: 12px; font-weight: bold; margin: 0 0 10px 0;">⚠️ CRITICAL SAFETY ITEM</p>' : ''}
+                ${notes[item.id] ? `<p style="color: #374151; font-size: 13px; margin: 0 0 10px 0;"><strong>Notes:</strong> ${notes[item.id]}</p>` : ''}
+                <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+                  ${photoRows}
+                </table>
+              </td>
+            </tr>
+          </table>`;
         }).join('');
 
       const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -693,7 +717,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           onClick={() => setShowHistory(true)}
           className="w-full mt-3 bg-gray-600 text-white py-3 text-base sm:text-lg rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-gray-700 active:bg-gray-800 transition-colors"
         >
-          <History size={20} className="sm:hidden" /><History size={22} className="hidden sm:block" /> View History ({savedInspections.length})
+          <History size={20} className="sm:hidden" /><History size={22} className="hidden sm:block" /> Inspection History ({savedInspections.length})
         </button>
       )}
     </div>
@@ -1270,18 +1294,48 @@ This is an automated report from the MF King Vehicle Inspection System.
         <div className="flex justify-between items-center">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800">Inspection History</h2>
           <button
-            onClick={() => setShowHistory(false)}
+            onClick={() => {
+              setShowHistory(false);
+              setHistorySearchTruck('');
+            }}
             className="text-gray-600 hover:text-gray-800 font-medium"
           >
             Close
           </button>
         </div>
 
+        {/* Search Filter */}
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            🔍 Search by Vehicle Registration Number
+          </label>
+          <input
+            type="text"
+            value={historySearchTruck}
+            onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
+            placeholder="Enter registration number (e.g., ABC123)"
+            className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+          />
+          {historySearchTruck && (
+            <button
+              onClick={() => setHistorySearchTruck('')}
+              className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Clear Search
+            </button>
+          )}
+        </div>
+
         {savedInspections.length === 0 ? (
           <p className="text-gray-600 text-center py-8">No inspections saved yet.</p>
         ) : (
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {savedInspections.map((inspection) => {
+            {savedInspections
+              .filter(inspection => {
+                if (!historySearchTruck) return true;
+                return inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+              })
+              .map((inspection) => {
               const failedCount = Object.values(inspection.inspectionData).filter(v => v === 'fail').length;
               
               return (
@@ -1322,6 +1376,15 @@ This is an automated report from the MF King Vehicle Inspection System.
                 </div>
               );
             })}
+            {savedInspections.filter(inspection => {
+              if (!historySearchTruck) return true;
+              return inspection.truckNumber.toUpperCase().includes(historySearchTruck);
+            }).length === 0 && historySearchTruck && (
+              <div className="text-center py-8 text-gray-600">
+                <p className="font-semibold mb-1">No inspections found</p>
+                <p className="text-sm">No inspections match "{historySearchTruck}"</p>
+              </div>
+            )}
           </div>
         )}
       </div>
