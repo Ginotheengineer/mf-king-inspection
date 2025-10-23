@@ -1333,7 +1333,7 @@ This is an automated report from the MF King Vehicle Inspection System.
               type="text"
               value={historySearchTruck}
               onChange={(e) => setHistorySearchTruck(e.target.value.toUpperCase())}
-              placeholder="enter registration number (e.g., ABC123)"
+              placeholder="Enter Registration Number (e.g ABC123)"
               className="w-full px-3 py-2.5 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
             />
           </div>
@@ -1343,16 +1343,19 @@ This is an automated report from the MF King Vehicle Inspection System.
               <User size={16} className="text-gray-600" />
               Filter by Driver Name
             </label>
-            <select
+            <input
+              type="text"
               value={historySearchDriver}
               onChange={(e) => setHistorySearchDriver(e.target.value)}
+              placeholder="Enter Driver Name"
+              list="driver-suggestions"
               className="w-full px-3 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="">All Drivers</option>
+            />
+            <datalist id="driver-suggestions">
               {drivers.map((driver) => (
-                <option key={driver.id} value={driver.name}>{driver.name}</option>
+                <option key={driver.id} value={driver.name} />
               ))}
-            </select>
+            </datalist>
           </div>
           
           {(historySearchTruck || historySearchDriver) && (
