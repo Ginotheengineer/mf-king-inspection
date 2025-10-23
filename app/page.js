@@ -186,7 +186,6 @@ export default function TruckInspectionApp() {
 
     request.onsuccess = () => {
       loadDrivers(db);
-      alert('✅ Driver added successfully!');
     };
 
     request.onerror = () => {
@@ -215,7 +214,6 @@ export default function TruckInspectionApp() {
       request.onsuccess = () => {
         console.log('Driver deleted successfully');
         loadDrivers(db);
-        alert('✅ Driver deleted successfully!');
       };
 
       request.onerror = (error) => {
@@ -742,9 +740,9 @@ This is an automated report from the MF King Vehicle Inspection System.
                       className="relative inline-block"
                     >
                       <AlertTriangle size={20} className="text-red-600" />
-                      <span className="tooltip-text absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
+                      <span className="tooltip-text absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 px-3 py-2 text-xs font-normal text-white bg-gray-900 rounded-lg whitespace-nowrap opacity-0 invisible transition-all duration-200 pointer-events-none shadow-lg" style={{zIndex: 50}}>
                         Critical safety item - must be functional
-                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
+                        <span className="absolute top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-gray-900" style={{marginTop: '-4px'}}></span>
                       </span>
                     </button>
                   )}
