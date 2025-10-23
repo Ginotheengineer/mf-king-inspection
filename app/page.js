@@ -1512,7 +1512,6 @@ This is an automated report from the MF King Vehicle Inspection System.
                 }}
                 placeholder="Enter Registration Number (e.g ABC123)"
                 className="w-full px-3 py-3 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                style={{ textTransform: 'uppercase' }}
               />
               {historyVehicleDropdownOpen && (
                 <>
