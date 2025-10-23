@@ -42,6 +42,7 @@ export default function TruckInspectionApp() {
   const [showManageDrivers, setShowManageDrivers] = useState(false);
   const [newDriverName, setNewDriverName] = useState('');
   const [driverToDelete, setDriverToDelete] = useState(null);
+  const [isCompletingInspection, setIsCompletingInspection] = useState(false);
 
 
   const inspectionItems = [
@@ -630,17 +631,24 @@ This is an automated report from the MF King Vehicle Inspection System.
       }
     };
 
-    // If no damages, save immediately to history
+    // If no damages, save immediately to history with loading state
     if (!hasDamages()) {
-      saveInspection(inspectionRecord);
+      setIsCompletingInspection(true);
+      // Simulate a brief delay for better UX
+      setTimeout(() => {
+        saveInspection(inspectionRecord);
+        setIsCompletingInspection(false);
+        setShowSummary(true);
+      }, 800);
+    } else {
+      // If damages, will save when Send Report is clicked
+      setShowSummary(true);
     }
-    // If damages, will save when Send Report is clicked
-    setShowSummary(true);
   };
 
   const renderDriverInfo = () => (
     <div className="space-y-4">
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Driver Information</h2>
+      <h2 className="text-lg sm:text-xl font-bold text-gray-800">Driver Information</h2>
       <div className="space-y-3">
         <div>
           <div className="flex justify-between items-center mb-2">
@@ -702,7 +710,7 @@ This is an automated report from the MF King Vehicle Inspection System.
         >
           ← Back
         </button>
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Vehicle Inspection</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800">Vehicle Inspection</h2>
         <span className="text-base sm:text-lg font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
           {Object.keys(inspectionData).length}/{inspectionItems.length}
         </span>
@@ -830,10 +838,23 @@ This is an automated report from the MF King Vehicle Inspection System.
 
       <button
         onClick={() => hasDamages() ? setCurrentStep('workshop') : completeInspection()}
-        disabled={Object.keys(inspectionData).length !== inspectionItems.length}
-        className="w-full mt-6 bg-red-600 text-white py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-lg"
+        disabled={Object.keys(inspectionData).length !== inspectionItems.length || isCompletingInspection}
+        className={`w-full mt-6 py-4 text-lg rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg ${
+          isCompletingInspection
+            ? 'bg-orange-500 text-white cursor-wait'
+            : 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 disabled:bg-gray-400 disabled:cursor-not-allowed'
+        }`}
       >
-        {hasDamages() ? 'Select Workshop' : 'Complete Inspection'} <ChevronRight size={24} />
+        {isCompletingInspection ? (
+          <>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+            Completing Inspection...
+          </>
+        ) : (
+          <>
+            {hasDamages() ? 'Select Workshop' : 'Complete Inspection'} <ChevronRight size={24} />
+          </>
+        )}
       </button>
     </div>
   );
@@ -847,7 +868,7 @@ This is an automated report from the MF King Vehicle Inspection System.
         >
           ← Back
         </button>
-        <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 text-center">Select Workshop(s)</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-gray-800 text-center">Select Workshop(s)</h2>
         <div className="w-12 sm:w-16"></div>
       </div>
       <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
@@ -1029,7 +1050,7 @@ This is an automated report from the MF King Vehicle Inspection System.
           ) : (
             <div className="w-12 sm:w-16"></div>
           )}
-          <h2 className="text-base sm:text-xl md:text-2xl font-bold text-gray-800 text-center">Inspection Summary</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800 text-center">Inspection Summary</h2>
           <div className="w-12 sm:w-16"></div>
         </div>
         
@@ -1161,7 +1182,7 @@ This is an automated report from the MF King Vehicle Inspection System.
       return (
         <div className="space-y-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">Inspection Report</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">Inspection Report</h2>
             <button
               onClick={() => setViewingInspection(null)}
               className="text-red-600 hover:text-red-800 font-bold"
@@ -1249,7 +1270,7 @@ This is an automated report from the MF King Vehicle Inspection System.
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">Inspection History</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-800">Inspection History</h2>
           <button
             onClick={() => setShowHistory(false)}
             className="text-gray-600 hover:text-gray-800 font-medium"
