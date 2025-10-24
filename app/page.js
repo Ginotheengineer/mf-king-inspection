@@ -1882,7 +1882,12 @@ This is an automated report from the MF King Vehicle Inspection System.
       {showManageDrivers && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowManageDrivers(false)}
+          onClick={() => {
+            setShowManageDrivers(false);
+            setEditingDriver(null);
+            setShowAddDriver(false);
+            setNewDriverName('');
+          }}
         >
           <div 
             className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
@@ -1891,7 +1896,12 @@ This is an automated report from the MF King Vehicle Inspection System.
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-800">Manage Drivers</h3>
               <button
-                onClick={() => setShowManageDrivers(false)}
+                onClick={() => {
+                  setShowManageDrivers(false);
+                  setEditingDriver(null);
+                  setShowAddDriver(false);
+                  setNewDriverName('');
+                }}
                 className="text-gray-600 hover:text-gray-800 font-bold text-2xl"
               >
                 ✕
@@ -2060,7 +2070,12 @@ This is an automated report from the MF King Vehicle Inspection System.
       {showManageVehicles && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowManageVehicles(false)}
+          onClick={() => {
+            setShowManageVehicles(false);
+            setEditingVehicle(null);
+            setShowAddVehicle(false);
+            setNewVehicleRego('');
+          }}
         >
           <div 
             className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
@@ -2069,7 +2084,12 @@ This is an automated report from the MF King Vehicle Inspection System.
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-800">Manage Vehicles</h3>
               <button
-                onClick={() => setShowManageVehicles(false)}
+                onClick={() => {
+                  setShowManageVehicles(false);
+                  setEditingVehicle(null);
+                  setShowAddVehicle(false);
+                  setNewVehicleRego('');
+                }}
                 className="text-gray-600 hover:text-gray-800 font-bold text-2xl"
               >
                 ✕
