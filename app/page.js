@@ -2098,17 +2098,7 @@ This is an automated report from the MF King Vehicle Inspection System.
                         
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">WOF Expiry Date</label>
-                            <input
-                              type="date"
-                              value={editingVehicle.wofExpiry || ''}
-                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, wofExpiry: e.target.value }))}
-                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">CoF Expiry Date</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">COF Expiry Date</label>
                             <input
                               type="date"
                               value={editingVehicle.coFExpiry || ''}
@@ -2133,6 +2123,16 @@ This is an automated report from the MF King Vehicle Inspection System.
                               type="date"
                               value={editingVehicle.serviceDate || ''}
                               onChange={(e) => setEditingVehicle(prev => ({ ...prev, serviceDate: e.target.value }))}
+                              className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Towing Connection Certification Expiry Date</label>
+                            <input
+                              type="date"
+                              value={editingVehicle.towingExpiry || ''}
+                              onChange={(e) => setEditingVehicle(prev => ({ ...prev, towingExpiry: e.target.value }))}
                               className="w-full px-3 py-2 text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                           </div>
@@ -2184,10 +2184,10 @@ This is an automated report from the MF King Vehicle Inspection System.
                               setEditingVehicle({ 
                                 id: vehicle.id, 
                                 rego: vehicle.rego,
-                                wofExpiry: vehicle.wofExpiry || '',
                                 coFExpiry: vehicle.coFExpiry || '',
                                 regoExpiry: vehicle.regoExpiry || '',
-                                serviceDate: vehicle.serviceDate || ''
+                                serviceDate: vehicle.serviceDate || '',
+                                towingExpiry: vehicle.towingExpiry || ''
                               });
                             }}
                             className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-semibold hover:bg-blue-700 active:bg-blue-800"

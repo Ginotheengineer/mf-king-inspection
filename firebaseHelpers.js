@@ -341,10 +341,10 @@ export const saveVehicleToFirebase = async (vehicleData) => {
   try {
     const docRef = await addDoc(collection(db, 'vehicles'), {
       rego: typeof vehicleData === 'string' ? vehicleData.toUpperCase() : vehicleData.rego.toUpperCase(),
-      wofExpiry: vehicleData.wofExpiry || null,
       coFExpiry: vehicleData.coFExpiry || null,
       regoExpiry: vehicleData.regoExpiry || null,
       serviceDate: vehicleData.serviceDate || null,
+      towingExpiry: vehicleData.towingExpiry || null,
       createdAt: new Date().toISOString()
     });
     console.log('Vehicle saved with ID:', docRef.id);
@@ -402,10 +402,10 @@ export const updateVehicleInFirebase = async (vehicleId, vehicleData) => {
   try {
     await updateDoc(doc(db, 'vehicles', vehicleId), {
       rego: vehicleData.rego.toUpperCase(),
-      wofExpiry: vehicleData.wofExpiry || null,
       coFExpiry: vehicleData.coFExpiry || null,
       regoExpiry: vehicleData.regoExpiry || null,
       serviceDate: vehicleData.serviceDate || null,
+      towingExpiry: vehicleData.towingExpiry || null,
       updatedAt: new Date().toISOString()
     });
     console.log('Vehicle updated:', vehicleId);
